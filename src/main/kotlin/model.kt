@@ -25,7 +25,7 @@ data class Buffer(val name: String?,
 data class BufferView(val name: String?,
                       val buffer: Int,
                       val bufferOffset: Int,
-                      val bufferLength: Int,
+                      val byteLength: Int,
                       val target: Int)
 
 data class Accessor(val name: String?,

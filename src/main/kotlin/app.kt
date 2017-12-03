@@ -1,56 +1,43 @@
-import org.apache.http.client.cache.HttpCacheEntry
-import org.apache.http.client.cache.HttpCacheStorage
-import org.apache.http.client.cache.HttpCacheUpdateCallback
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.impl.client.CloseableHttpClient
-import org.apache.http.impl.client.cache.CachingHttpClientBuilder
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.net.URI
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
-class MyHttpCacheStorage : HttpCacheStorage {
-    private val cache = mutableMapOf<String, HttpCacheEntry>()
-
-    override fun getEntry(key: String): HttpCacheEntry? {
-        println(cache)
-        val cached = cache[key]
-        println("${Thread.currentThread()} get entry $key: $cached")
-        return cached
-    }
-
-    override fun putEntry(key: String, entry: HttpCacheEntry) {
-        println("${Thread.currentThread()} put entry $key: $entry")
-        cache[key] = entry
-    }
-
-    override fun removeEntry(key: String) {
-        cache.remove(key)
-    }
-
-    override fun updateEntry(key: String, callback: HttpCacheUpdateCallback) {
-        println("update entry: $key")
-        cache[key] = callback.update(cache[key])
-    }
-
-
+fun getSampleModelUri(name: String, variant: String): URI {
+    return URI("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/$name/$variant/$name.gltf")
 }
 
-fun readString(httpClient: CloseableHttpClient, uri: String): String {
-    val request = HttpGet(uri)
-    return httpClient.execute(request).use { response ->
-        response.entity.content.use { stream ->
-            val bytes = stream.readBytes()
-            String(bytes)
+data class GltfData(val model: Root, val buffers: List<ByteArray>)
+
+fun downloadGltfAsset(uri: URI, cache: Cache): GltfData {
+    val json = cache.strings.get(uri)
+    val gson = Gson()
+
+    val root: Root = gson.fromJson(json, object : TypeToken<Root>() {}.type)
+
+    val executor = Executors.newFixedThreadPool(2)
+    try {
+        val bufferFutures: List<Future<ByteArray>> = root.buffers.map { buffer ->
+            executor.submit(Callable<ByteArray> {
+                cache.bytes.get(uri.resolve(buffer.uri))
+            })
         }
+
+        val buffersData: List<ByteArray> = bufferFutures.map { it.get() }
+        return GltfData(root,
+                buffersData)
+    } finally {
+        executor.shutdown()
     }
 }
 
 fun main(args: Array<String>) {
 
-    val httpClient = CachingHttpClientBuilder.create()
-            .setHttpCacheStorage(MyHttpCacheStorage())
-            .build()
+    val uri = getSampleModelUri("TriangleWithoutIndices", "glTF")
 
-    readString(httpClient, "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf")
-
-    readString(httpClient, "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/TriangleWithoutIndices/glTF/TriangleWithoutIndices.gltf")
+    Cache().use { cache ->
+        downloadGltfAsset(uri, cache)
+    }
 }
-
-

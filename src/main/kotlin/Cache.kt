@@ -41,7 +41,7 @@ class Cache : Closeable {
 
     inner abstract class InnerCache<T> {
 
-        fun get(uri: URI): T? {
+        fun get(uri: URI): T {
             val entry = entries[uri]
             return if (entry != null) {
                 read(entry.file)

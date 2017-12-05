@@ -15,7 +15,7 @@ fun main(args: Array<String>) {
     val app = Cache().use { cache ->
         val gltf = Root.load(cache.strings.get(uri))
         val data = downloadGltfData(uri, gltf, cache)
-        GltfViewer(gltf,  data)
+        GltfViewer(gltf, data)
     }
 
     val config = Config(width = 1024,
@@ -50,12 +50,21 @@ fun downloadGltfData(uri: URI, root: Root, cache: Cache): GltfData {
     }
 }
 
+class GLPrimitive(val vertexArrayId: Int, val mode: Int, val count: Int) {
+    fun render() {
+        glBindVertexArray(vertexArrayId)
+        glDrawArrays(mode, 0, count)
+    }
+}
+
 class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private val bufferId = IntArray(gltf.bufferViews.size)
 
     private val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
-    private val vertexArrayId = IntArray(gltf.meshes.size)
+    private val primitives = ArrayList<GLPrimitive>(primitivesNum)
+
+    private val vertexArrayId = IntArray(primitivesNum)
 
     private val locations = mapOf("POSITION" to 0)
 
@@ -67,9 +76,10 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     private fun initMeshes() {
         glGenVertexArrays(vertexArrayId)
 
-        gltf.meshes.forEachIndexed { i, mesh ->
-            glBindVertexArray(vertexArrayId[i])
+        var primitiveIndex = 0
+        gltf.meshes.forEach { mesh ->
             mesh.primitives.forEach { primitive ->
+                glBindVertexArray(vertexArrayId[primitiveIndex])
                 primitive.attributes.forEach { (attribute, accessorIndex) ->
                     val accessor = gltf.accessors[accessorIndex]
                     val bufferView = gltf.bufferViews[accessor.bufferView]
@@ -79,7 +89,13 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                         glVertexAttribPointer(location,
                                 numberOfComponents(accessor.type), accessor.componentType, false, 0, accessor.byteOffset.toLong())
                     }
+                    primitives.add(GLPrimitive(
+                            vertexArrayId[primitiveIndex],
+                            primitive.mode ?: GL_TRIANGLES,
+                            gltf.accessors[primitive.attributes.values.first()].count
+                    ))
                 }
+                primitiveIndex++
             }
         }
     }
@@ -108,15 +124,8 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     }
 
     private fun renderScene(scene: Scene) {
-        scene.nodes.forEach { nodeIndex ->
-            val node = gltf.nodes[nodeIndex]
-            val mesh = gltf.meshes[node.mesh]
-            glBindVertexArray(vertexArrayId[node.mesh])
-            mesh.primitives.forEach { primitive ->
-                val mode = primitive.mode ?: GL_TRIANGLES
-                val count = gltf.accessors[primitive.attributes.values.first()].count
-                glDrawArrays(mode, 0, count)
-            }
+        for (primitive in primitives) {
+            primitive.render()
         }
     }
 

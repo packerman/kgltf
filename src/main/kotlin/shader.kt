@@ -6,9 +6,9 @@ import java.net.URL
 
 object Programs {
     val flat: Program by lazy {
-        Program.create("lazy",
+        Program.create("flat",
                 attributes = setOf("position"),
-                uniforms = setOf("color")
+                uniforms = setOf("mvp", "color")
         )
     }
 }
@@ -29,9 +29,9 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
             val shaders = collectShadersForProgram(name)
             val program = linkProgram(shaders)
             shaders.forEach(::glDeleteShader)
-            val attributeMap: Map<String, Int> = attributes.buildMap { glGetAttribLocation(program, it) }
+            val attributeMap = attributes.buildMap { glGetAttribLocation(program, it) }
             warnAboutNegativeLocations(attributeMap, name)
-            val uniformMap: Map<String, Int> = uniforms.buildMap { glGetUniformLocation(program, it) }
+            val uniformMap = uniforms.buildMap { glGetUniformLocation(program, it) }
             warnAboutNegativeLocations(uniformMap, name)
             return Program(name, program, attributeMap, uniformMap)
         }
@@ -51,6 +51,9 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
 
 fun linkProgram(shaders: IntArray): Int {
     val program = glCreateProgram()
+    for (shader in shaders) {
+        glAttachShader(program, shader)
+    }
     glLinkProgram(program)
     val status = glGetProgrami(program, GL_LINK_STATUS)
     if (status == GL_FALSE) {

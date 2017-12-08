@@ -4,6 +4,7 @@ import org.lwjgl.glfw.GLFWErrorCallback
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL20.GL_SHADING_LANGUAGE_VERSION
+import org.lwjgl.opengl.GLUtil
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
@@ -23,6 +24,7 @@ abstract class Application {
 data class Config(val width: Int = 640,
                   val height: Int = 480,
                   val title: String = "",
+                  val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
 fun launch(app: Application, config: Config = Config()) {
@@ -37,6 +39,9 @@ fun launch(app: Application, config: Config = Config()) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2)
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+    }
+    if (config.glDebug) {
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
     }
 
     val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
@@ -54,6 +59,12 @@ fun launch(app: Application, config: Config = Config()) {
     glfwShowWindow(window)
 
     GL.createCapabilities()
+    val debugProc = GLUtil.setupDebugMessageCallback()
+    if (debugProc != null) {
+        println("Enabled GL debug mode")
+    } else if (config.glDebug) {
+        println("Failed to enable gl debug mode")
+    }
 
     println("GL vendor: ${glGetString(GL_VENDOR)}")
     println("GL renderer: ${glGetString(GL_RENDERER)}")
@@ -98,6 +109,10 @@ fun launch(app: Application, config: Config = Config()) {
     }
 
     app.shutdown()
+
+    if (debugProc != null) {
+        debugProc.free()
+    }
 
     glfwFreeCallbacks(window)
     glfwDestroyWindow(window)

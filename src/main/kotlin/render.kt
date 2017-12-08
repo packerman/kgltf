@@ -1,8 +1,12 @@
+import org.joml.Matrix4f
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
-import org.lwjgl.opengl.GL20.glVertexAttribPointer
+import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
+import util.Color
+import util.Colors
+import util.checkGLError
+import util.get
 
 class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
@@ -13,11 +17,22 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private val vertexArrayId = IntArray(primitivesNum)
 
+    private val color = FloatArray(4)
+
     private val locations = mapOf("POSITION" to 0)
 
+    private val mvp = Matrix4f()
+    private val mvpArray = FloatArray(16)
+
     override fun init() {
+        setClearColor(Colors.BLACK)
         initBufferViews()
         initMeshes()
+        checkGLError()
+    }
+
+    private fun setClearColor(color: Color) {
+        glClearColor(color.r, color.g, color.b, color.a)
     }
 
     private fun initMeshes() {
@@ -25,24 +40,32 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
         var primitiveIndex = 0
         gltf.meshes.forEach { mesh ->
-            mesh.primitives.forEach { primitive ->
-                glBindVertexArray(vertexArrayId[primitiveIndex])
-                primitive.attributes.forEach { (attribute, accessorIndex) ->
-                    val accessor = gltf.accessors[accessorIndex]
-                    val bufferView = gltf.bufferViews[accessor.bufferView]
-                    glBindBuffer(bufferView.target, bufferId[accessor.bufferView])
-                    locations[attribute]?.let { location ->
-                        glEnableVertexAttribArray(location)
-                        glVertexAttribPointer(location,
-                                numberOfComponents(accessor.type), accessor.componentType, false, 0, accessor.byteOffset.toLong())
-                    }
-                    primitives.add(GLPrimitive(
-                            vertexArrayId[primitiveIndex],
-                            primitive.mode ?: GL_TRIANGLES,
-                            gltf.accessors[primitive.attributes.values.first()].count
-                    ))
+            Programs.flat.use {
+                uniforms["mvp"]?.let { location ->
+                    glUniformMatrix4fv(location,false, mvp.get(mvpArray))
                 }
-                primitiveIndex++
+                uniforms["color"]?.let { location ->
+                    glUniform4fv(location, Colors.GRAY.get(color))
+                }
+                mesh.primitives.forEach { primitive ->
+                    glBindVertexArray(vertexArrayId[primitiveIndex])
+                    primitive.attributes.forEach { (attribute, accessorIndex) ->
+                        val accessor = gltf.accessors[accessorIndex]
+                        val bufferView = gltf.bufferViews[accessor.bufferView]
+                        glBindBuffer(bufferView.target, bufferId[accessor.bufferView])
+                        locations[attribute]?.let { location ->
+                            glEnableVertexAttribArray(location)
+                            glVertexAttribPointer(location,
+                                    numberOfComponents(accessor.type), accessor.componentType, false, 0, accessor.byteOffset.toLong())
+                        }
+                        primitives.add(GLPrimitive(
+                                vertexArrayId[primitiveIndex],
+                                primitive.mode ?: GL_TRIANGLES,
+                                gltf.accessors[primitive.attributes.values.first()].count
+                        ))
+                    }
+                    primitiveIndex++
+                }
             }
         }
     }
@@ -67,7 +90,11 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     }
 
     override fun render() {
-        renderScene(gltf.scenes[0])
+        glClear(GL_COLOR_BUFFER_BIT)
+        Programs.flat.use {
+            renderScene(gltf.scenes[0])
+        }
+        checkGLError()
     }
 
     private fun renderScene(scene: Scene) {
@@ -77,7 +104,7 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     }
 
     override fun resize(width: Int, height: Int) {
-
+        glViewport(0, 0, width, height)
     }
 
     override fun shutdown() {

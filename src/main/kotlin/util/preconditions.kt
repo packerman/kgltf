@@ -2,11 +2,12 @@ package util
 
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION
+import java.util.logging.Logger
 
 inline fun warn(value: Boolean, lazyMessage: () -> Any): Unit {
     if (value) {
         val message = lazyMessage()
-        System.err.println(message)
+        logger.warning(message.toString())
     }
 }
 
@@ -25,3 +26,5 @@ fun checkGLError() {
         }
     }
 }
+
+val logger: Logger = Logger.getLogger("kgltf.checks")

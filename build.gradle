@@ -20,6 +20,10 @@ apply plugin: 'kotlin'
 
 sourceCompatibility = 1.8
 
+apply plugin: 'application'
+mainClassName = 'AppKt'
+applicationDefaultJvmArgs = ['-XstartOnFirstThread']
+
 repositories {
     mavenCentral()
 }

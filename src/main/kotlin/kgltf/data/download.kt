@@ -1,3 +1,5 @@
+package kgltf.data
+
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import java.io.Closeable
@@ -41,7 +43,7 @@ class Cache : Closeable {
 
     inner abstract class InnerCache<T> {
 
-        fun get(uri: URI): T? {
+        fun get(uri: URI): T {
             val entry = entries[uri]
             return if (entry != null) {
                 read(entry.file)

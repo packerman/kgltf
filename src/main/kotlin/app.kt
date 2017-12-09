@@ -1,43 +1,71 @@
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import KhronosSample.TriangleWithoutIndices
+import Variant.Gltf
+import Variant.GltfEmbedded
+import kgltf.data.Cache
+import kgltf.data.DataUri
 import java.net.URI
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
-fun getSampleModelUri(name: String, variant: String): URI {
-    return URI("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/$name/$variant/$name.gltf")
+enum class KhronosSample(_alternateName: String? = null) {
+    TriangleWithoutIndices;
+
+    val sampleName: String = _alternateName ?: name
+
+    override fun toString() = sampleName
 }
 
-data class GltfData(val model: Root, val buffers: List<ByteArray>)
+enum class Variant(val value: String) {
+    Gltf("glTF"),
+    GltfEmbedded("glTF-Embedded");
 
-fun downloadGltfAsset(uri: URI, cache: Cache): GltfData {
-    val json = cache.strings.get(uri)
-    val gson = Gson()
+    override fun toString() = value
+}
 
-    val root: Root = gson.fromJson(json, object : TypeToken<Root>() {}.type)
+fun main(args: Array<String>) {
+    val uri = getSampleModelUri(TriangleWithoutIndices, GltfEmbedded)
+
+    val app = Cache().use { cache ->
+        val gltf = Root.load(cache.strings.get(uri))
+        val data = downloadGltfData(uri, gltf, cache)
+        GltfViewer(gltf, data)
+    }
+
+    val config = Config(width = 1024,
+            height = 640,
+            title = "glTF")
+
+    launch(app, config)
+}
+
+fun getSampleModelUri(sample: KhronosSample, variant: Variant = Gltf): URI {
+    return URI("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/$sample/$variant/$sample.gltf")
+}
+
+data class GltfData(val buffers: List<ByteArray>)
+
+fun downloadGltfData(uri: URI, root: Root, cache: Cache): GltfData {
 
     val executor = Executors.newFixedThreadPool(2)
     try {
         val bufferFutures: List<Future<ByteArray>> = root.buffers.map { buffer ->
             executor.submit(Callable<ByteArray> {
-                cache.bytes.get(uri.resolve(buffer.uri))
+                val bufferUri = uri.resolve(buffer.uri)
+                val data = when (bufferUri.scheme) {
+                    "http" -> cache.bytes.get(bufferUri)
+                    "https" -> cache.bytes.get(bufferUri)
+                    "data" -> DataUri.encode(bufferUri)
+                    else -> throw IllegalStateException("Unknown scheme ${bufferUri.scheme}")
+                }
+                check(data.size == buffer.byteLength)
+                data
             })
         }
 
         val buffersData: List<ByteArray> = bufferFutures.map { it.get() }
-        return GltfData(root,
-                buffersData)
+        return GltfData(buffersData)
     } finally {
         executor.shutdown()
-    }
-}
-
-fun main(args: Array<String>) {
-
-    val uri = getSampleModelUri("TriangleWithoutIndices", "glTF")
-
-    Cache().use { cache ->
-        downloadGltfAsset(uri, cache)
     }
 }

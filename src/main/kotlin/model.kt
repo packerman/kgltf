@@ -1,10 +1,21 @@
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
 data class Root(val scenes: List<Scene>,
                 val nodes: List<Node>,
                 val meshes: List<Mesh>,
                 val buffers: List<Buffer>,
                 val bufferViews: List<BufferView>,
                 val accessors: List<Accessor>,
-                val asset: Asset)
+                val asset: Asset) {
+
+    companion object {
+        private val gson = Gson()
+        private val type = object : TypeToken<Root>() {}.type
+
+        fun load(json: String): Root = gson.fromJson(json, type)
+    }
+}
 
 data class Scene(val name: String?,
                  val nodes: List<Int>)
@@ -16,7 +27,8 @@ data class Mesh(val name: String?,
                 val primitives: List<Primitive>)
 
 data class Primitive(val attributes: Map<String, Int>,
-                     val indices: Int?)
+                     val indices: Int?,
+                     val mode: Int?)
 
 data class Buffer(val name: String?,
                   val uri: String,
@@ -25,7 +37,7 @@ data class Buffer(val name: String?,
 data class BufferView(val name: String?,
                       val buffer: Int,
                       val bufferOffset: Int,
-                      val bufferLength: Int,
+                      val byteLength: Int,
                       val target: Int)
 
 data class Accessor(val name: String?,

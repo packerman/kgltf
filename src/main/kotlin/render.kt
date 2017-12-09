@@ -1,19 +1,19 @@
+import kgltf.util.*
 import org.joml.Matrix4f
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
-import kgltf.util.Color
-import kgltf.util.Colors
-import kgltf.util.checkGLError
-import kgltf.util.get
 
 class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private val bufferId = IntArray(gltf.bufferViews.size)
 
+    private val accessors = gltf.accessors
+
     private val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
-    private val primitives = ArrayList<GLPrimitive>(primitivesNum)
+    private val startPrimitiveIndex = gltf.meshes.map { it.primitives.size }.sums()
+    private val drawables = ArrayList<() -> Unit>(primitivesNum)
 
     private val vertexArrayId = IntArray(primitivesNum)
 
@@ -38,35 +38,52 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     private fun initMeshes() {
         glGenVertexArrays(vertexArrayId)
 
-        var primitiveIndex = 0
-        gltf.meshes.forEach { mesh ->
+        gltf.meshes.forEachIndexed { i, mesh ->
             Programs.flat.use {
                 uniforms["mvp"]?.let { location ->
-                    glUniformMatrix4fv(location,false, mvp.get(mvpArray))
+                    glUniformMatrix4fv(location, false, mvp.get(mvpArray))
                 }
                 uniforms["color"]?.let { location ->
                     glUniform4fv(location, Colors.GRAY.get(color))
                 }
-                mesh.primitives.forEach { primitive ->
+                mesh.primitives.forEachIndexed { j, primitive ->
+                    val primitiveIndex = startPrimitiveIndex[i] + j
                     glBindVertexArray(vertexArrayId[primitiveIndex])
                     primitive.attributes.forEach { (attribute, accessorIndex) ->
-                        val accessor = gltf.accessors[accessorIndex]
-                        val bufferView = gltf.bufferViews[accessor.bufferView]
-                        glBindBuffer(bufferView.target, bufferId[accessor.bufferView])
+                        val accessor = accessors[accessorIndex]
+                        accessor.bindBuffer()
                         locations[attribute]?.let { location ->
                             glEnableVertexAttribArray(location)
                             glVertexAttribPointer(location,
                                     numberOfComponents(accessor.type), accessor.componentType, false, 0, accessor.byteOffset.toLong())
                         }
-                        primitives.add(GLPrimitive(
-                                vertexArrayId[primitiveIndex],
-                                primitive.mode ?: GL_TRIANGLES,
-                                gltf.accessors[primitive.attributes.values.first()].count
-                        ))
                     }
-                    primitiveIndex++
+                    val mode = primitive.mode ?: GL_TRIANGLES
+                    if (primitive.indices != null) {
+                        val accessor = accessors[primitive.indices]
+                        accessor.bindBuffer()
+                        addDrawable(vertexArrayId[primitiveIndex]) {
+                            glDrawElements(mode, accessor.count, accessor.componentType, accessor.byteOffset.toLong())
+                        }
+                    } else {
+                        val count = accessors[primitive.attributes.values.first()].count
+                        addDrawable(vertexArrayId[primitiveIndex]) {
+                            glDrawArrays(mode, 0, count)
+                        }
+                    }
+                    glBindVertexArray(0)
+                    primitive.targets.forEach { target ->
+                        glBindBuffer(target, 0)
+                    }
                 }
             }
+        }
+    }
+
+    private inline fun addDrawable(vertexArrayId: Int, crossinline drawCall: () -> Unit) {
+        drawables.add {
+            glBindVertexArray(vertexArrayId)
+            drawCall()
         }
     }
 
@@ -80,7 +97,7 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                 val mappedBuffer = glMapBuffer(target, GL_WRITE_ONLY) ?: throw RuntimeException("Cannot allocate buffer")
                 mappedBuffer.put(
                         data.buffers[buffer],
-                        bufferOffset,
+                        byteOffset,
                         byteLength
                 )
                 glUnmapBuffer(target)
@@ -98,8 +115,8 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     }
 
     private fun renderScene(scene: Scene) {
-        for (primitive in primitives) {
-            primitive.render()
+        for (drawable in drawables) {
+            drawable()
         }
     }
 
@@ -112,8 +129,27 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
         glDeleteVertexArrays(vertexArrayId)
     }
 
+    private fun Accessor.bindBuffer() {
+        val target = gltf.bufferViews[bufferView].target
+        glBindBuffer(target, bufferId[bufferView])
+    }
+
+    private val Primitive.targets: Set<Int>
+        get() {
+            fun getTargetForAccessorIndex(index: Int) =
+                    gltf.bufferViews[gltf.accessors[index].bufferView].target
+            val targets = attributes.values
+                    .mapTo(HashSet()) {
+                        getTargetForAccessorIndex(it)
+                    }
+            if (indices != null) {
+                targets.add(getTargetForAccessorIndex(indices))
+            }
+            return targets
+        }
+
     companion object {
-        val supportedTargets = setOf(GL_ARRAY_BUFFER)
+        val supportedTargets = setOf(GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
 
         fun sizeInBytes(componentType: Int) =
                 when (componentType) {
@@ -137,12 +173,5 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                     "MAT4" -> 16
                     else -> throw IllegalArgumentException("Unknown type $type")
                 }
-    }
-}
-
-class GLPrimitive(val vertexArrayId: Int, val mode: Int, val count: Int) {
-    fun render() {
-        glBindVertexArray(vertexArrayId)
-        glDrawArrays(mode, 0, count)
     }
 }

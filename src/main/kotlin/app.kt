@@ -1,4 +1,3 @@
-import KhronosSample.TriangleWithoutIndices
 import Variant.Gltf
 import Variant.GltfEmbedded
 import kgltf.data.Cache
@@ -8,23 +7,8 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
-enum class KhronosSample(_alternateName: String? = null) {
-    TriangleWithoutIndices;
-
-    val sampleName: String = _alternateName ?: name
-
-    override fun toString() = sampleName
-}
-
-enum class Variant(val value: String) {
-    Gltf("glTF"),
-    GltfEmbedded("glTF-Embedded");
-
-    override fun toString() = value
-}
-
 fun main(args: Array<String>) {
-    val uri = getSampleModelUri(TriangleWithoutIndices, GltfEmbedded)
+    val uri = getSampleModelUri(KhronosSample.Triangle, GltfEmbedded)
 
     val app = Cache().use { cache ->
         val gltf = Root.load(cache.strings.get(uri))
@@ -37,6 +21,22 @@ fun main(args: Array<String>) {
             title = "glTF")
 
     launch(app, config)
+}
+
+enum class KhronosSample(_alternateName: String? = null) {
+    TriangleWithoutIndices,
+    Triangle;
+
+    val sampleName: String = _alternateName ?: name
+
+    override fun toString() = sampleName
+}
+
+enum class Variant(val value: String) {
+    Gltf("glTF"),
+    GltfEmbedded("glTF-Embedded");
+
+    override fun toString() = value
 }
 
 fun getSampleModelUri(sample: KhronosSample, variant: Variant = Gltf): URI {

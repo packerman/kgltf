@@ -7,7 +7,7 @@ import java.util.logging.Logger
 inline fun warn(value: Boolean, lazyMessage: () -> Any): Unit {
     if (value) {
         val message = lazyMessage()
-        logger.warning(message.toString())
+        Logger.getGlobal().warning(message.toString())
     }
 }
 
@@ -26,5 +26,3 @@ fun checkGLError() {
         }
     }
 }
-
-val logger: Logger = Logger.getLogger("kgltf.checks")

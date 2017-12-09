@@ -9,6 +9,7 @@ import java.net.URL
 import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.logging.Logger
 
 class Cache : Closeable {
 
@@ -48,6 +49,7 @@ class Cache : Closeable {
             return if (entry != null) {
                 read(entry.file)
             } else {
+                logger.info { "Download $uri" }
                 val data = read(uri.toURL())
                 val newFile = File.createTempFile("cached", "", directory)
                 write(newFile, data)
@@ -80,3 +82,5 @@ class Cache : Closeable {
         }
     }
 }
+
+private val logger = Logger.getLogger("kgltf.data")

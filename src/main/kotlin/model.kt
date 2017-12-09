@@ -36,7 +36,7 @@ data class Buffer(val name: String?,
 
 data class BufferView(val name: String?,
                       val buffer: Int,
-                      val bufferOffset: Int,
+                      val byteOffset: Int,
                       val byteLength: Int,
                       val target: Int)
 

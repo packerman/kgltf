@@ -1,3 +1,5 @@
+package kgltf.data
+
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import java.io.Closeable

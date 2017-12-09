@@ -1,7 +1,7 @@
 import org.lwjgl.opengl.GL11.GL_FALSE
 import org.lwjgl.opengl.GL20.*
-import util.buildMap
-import util.warn
+import kgltf.util.buildMap
+import kgltf.util.warn
 import java.net.URL
 
 object Programs {

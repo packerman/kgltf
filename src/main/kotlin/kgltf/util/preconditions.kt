@@ -1,4 +1,4 @@
-package util
+package kgltf.util
 
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION

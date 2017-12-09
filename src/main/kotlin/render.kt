@@ -3,10 +3,10 @@ import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
-import util.Color
-import util.Colors
-import util.checkGLError
-import util.get
+import kgltf.util.Color
+import kgltf.util.Colors
+import kgltf.util.checkGLError
+import kgltf.util.get
 
 class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 

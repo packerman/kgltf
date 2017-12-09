@@ -1,4 +1,4 @@
-package util
+package kgltf.util
 
 inline fun <K, V> Iterable<K>.buildMap(f: (K) -> V): Map<K, V> = HashMap<K, V>().apply {
     for (k in this@buildMap) {

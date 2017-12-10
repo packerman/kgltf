@@ -1,5 +1,4 @@
 import Variant.Gltf
-import Variant.GltfEmbedded
 import kgltf.data.Cache
 import kgltf.data.DataUri
 import java.net.URI
@@ -8,7 +7,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 fun main(args: Array<String>) {
-    val uri = getSampleModelUri(KhronosSample.Triangle, GltfEmbedded)
+    val uri = getSampleModelUri(KhronosSample.SimpleMeshes, Gltf)
 
     val app = Cache().use { cache ->
         val gltf = Root.load(cache.strings.get(uri))
@@ -25,7 +24,8 @@ fun main(args: Array<String>) {
 
 enum class KhronosSample(_alternateName: String? = null) {
     TriangleWithoutIndices,
-    Triangle;
+    Triangle,
+    SimpleMeshes;
 
     val sampleName: String = _alternateName ?: name
 

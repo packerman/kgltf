@@ -1,15 +1,17 @@
-import kgltf.util.*
+import kgltf.render.*
+import kgltf.util.checkGLError
+import kgltf.util.sums
 import org.joml.Matrix4f
+import org.joml.Quaternionf
+import org.joml.Vector3f
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.*
-import org.lwjgl.opengl.GL30.*
+import org.lwjgl.opengl.GL30.glDeleteVertexArrays
+import org.lwjgl.opengl.GL30.glGenVertexArrays
 
 class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private val bufferId = IntArray(gltf.bufferViews.size)
-
-    private val accessors = gltf.accessors
 
     private val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
     private val startPrimitiveIndex = gltf.meshes.map { it.primitives.size }.sums()
@@ -24,67 +26,24 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     private val mvp = Matrix4f()
     private val mvpArray = FloatArray(16)
 
+    private val bufferViews = ArrayList<GLBufferView>(gltf.bufferViews.size)
+    private val accessors = ArrayList<GLAccessor>(gltf.accessors.size)
+    private val meshes = ArrayList<GLMesh>(gltf.meshes.size)
+    private val nodes = ArrayList<GLNode>(gltf.nodes.size)
+    private val scenes = ArrayList<GLScene>(gltf.scenes.size)
+
     override fun init() {
         setClearColor(Colors.BLACK)
         initBufferViews()
+        initAccessors()
         initMeshes()
+        initNodes()
+        initScenes()
         checkGLError()
     }
 
     private fun setClearColor(color: Color) {
         glClearColor(color.r, color.g, color.b, color.a)
-    }
-
-    private fun initMeshes() {
-        glGenVertexArrays(vertexArrayId)
-
-        gltf.meshes.forEachIndexed { i, mesh ->
-            Programs.flat.use {
-                uniforms["mvp"]?.let { location ->
-                    glUniformMatrix4fv(location, false, mvp.get(mvpArray))
-                }
-                uniforms["color"]?.let { location ->
-                    glUniform4fv(location, Colors.GRAY.get(color))
-                }
-                mesh.primitives.forEachIndexed { j, primitive ->
-                    val primitiveIndex = startPrimitiveIndex[i] + j
-                    glBindVertexArray(vertexArrayId[primitiveIndex])
-                    primitive.attributes.forEach { (attribute, accessorIndex) ->
-                        val accessor = accessors[accessorIndex]
-                        accessor.bindBuffer()
-                        locations[attribute]?.let { location ->
-                            glEnableVertexAttribArray(location)
-                            glVertexAttribPointer(location,
-                                    numberOfComponents(accessor.type), accessor.componentType, false, 0, accessor.byteOffset.toLong())
-                        }
-                    }
-                    val mode = primitive.mode ?: GL_TRIANGLES
-                    if (primitive.indices != null) {
-                        val accessor = accessors[primitive.indices]
-                        accessor.bindBuffer()
-                        addDrawable(vertexArrayId[primitiveIndex]) {
-                            glDrawElements(mode, accessor.count, accessor.componentType, accessor.byteOffset.toLong())
-                        }
-                    } else {
-                        val count = accessors[primitive.attributes.values.first()].count
-                        addDrawable(vertexArrayId[primitiveIndex]) {
-                            glDrawArrays(mode, 0, count)
-                        }
-                    }
-                    glBindVertexArray(0)
-                    primitive.targets.forEach { target ->
-                        glBindBuffer(target, 0)
-                    }
-                }
-            }
-        }
-    }
-
-    private inline fun addDrawable(vertexArrayId: Int, crossinline drawCall: () -> Unit) {
-        drawables.add {
-            glBindVertexArray(vertexArrayId)
-            drawCall()
-        }
     }
 
     private fun initBufferViews() {
@@ -102,22 +61,94 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                 )
                 glUnmapBuffer(target)
                 glBindBuffer(target, 0)
+                bufferViews.add(GLBufferView(target, bufferId[i]))
             }
         }
+    }
+
+    private fun initAccessors() {
+        accessors.addAll(
+                gltf.accessors.map { accessor ->
+                    GLAccessor(
+                            bufferViews[accessor.bufferView],
+                            accessor.byteOffset.toLong(),
+                            accessor.componentType,
+                            accessor.count,
+                            numberOfComponents(accessor.type))
+                }
+        )
+    }
+
+    private fun initMeshes() {
+        glGenVertexArrays(vertexArrayId)
+        gltf.meshes.forEachIndexed { i, mesh ->
+            val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
+            mesh.primitives.forEachIndexed { j, primitive ->
+                val primitiveIndex = startPrimitiveIndex[i] + j
+                val mode = primitive.mode ?: GL_TRIANGLES
+                val attributes = primitive.attributes.mapValues { accessors[it.value] }
+                val glPrimitive = if (primitive.indices != null) {
+                    GLPrimitiveIndex(vertexArrayId[primitiveIndex], mode, attributes, accessors[primitive.indices])
+                } else {
+                    GLPrimitive(vertexArrayId[primitiveIndex], mode, attributes)
+                }
+                primitives.add(glPrimitive)
+            }
+            val glMesh = GLMesh(primitives)
+            glMesh.init()
+            meshes.add(glMesh)
+        }
+    }
+
+    private fun initNodes() {
+        nodes.addAll(
+                gltf.nodes.map { node ->
+                    val hasTransformations = node.translation != null || node.rotation != null || node.scale != null
+                    require(node.matrix == null || !hasTransformations)
+                    val transform = Transform()
+                    when {
+                        node.matrix != null -> {
+                            require(node.matrix.size == 16)
+                            transform.matrix = Matrix4f(
+                                    node.matrix[0], node.matrix[1], node.matrix[2], node.matrix[3],
+                                    node.matrix[4], node.matrix[5], node.matrix[6], node.matrix[7],
+                                    node.matrix[8], node.matrix[9], node.matrix[10], node.matrix[11],
+                                    node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15])
+                        }
+                        hasTransformations -> {
+                            if (node.translation != null) {
+                                require(node.translation.size == 3)
+                                transform.translation = Vector3f(node.translation[0], node.translation[1], node.translation[2])
+                            }
+                            if (node.rotation != null) {
+                                require(node.rotation.size == 4)
+                                transform.rotation = Quaternionf(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3])
+                            }
+                            if (node.scale != null) {
+                                require(node.scale.size == 3)
+                                transform.scale = Vector3f(node.scale[0], node.scale[1], node.scale[2])
+                            }
+                        }
+                    }
+                    GLNode(meshes[node.mesh], transform)
+                }
+        )
+    }
+
+    private fun initScenes() {
+        scenes.addAll(
+                gltf.scenes.map { scene ->
+                    GLScene(scene.nodes.map { nodes[it] })
+                }
+        )
     }
 
     override fun render() {
         glClear(GL_COLOR_BUFFER_BIT)
         Programs.flat.use {
-            renderScene(gltf.scenes[0])
+            scenes[0].render()
         }
         checkGLError()
-    }
-
-    private fun renderScene(scene: Scene) {
-        for (drawable in drawables) {
-            drawable()
-        }
     }
 
     override fun resize(width: Int, height: Int) {
@@ -128,25 +159,6 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
         glDeleteBuffers(bufferId)
         glDeleteVertexArrays(vertexArrayId)
     }
-
-    private fun Accessor.bindBuffer() {
-        val target = gltf.bufferViews[bufferView].target
-        glBindBuffer(target, bufferId[bufferView])
-    }
-
-    private val Primitive.targets: Set<Int>
-        get() {
-            fun getTargetForAccessorIndex(index: Int) =
-                    gltf.bufferViews[gltf.accessors[index].bufferView].target
-            val targets = attributes.values
-                    .mapTo(HashSet()) {
-                        getTargetForAccessorIndex(it)
-                    }
-            if (indices != null) {
-                targets.add(getTargetForAccessorIndex(indices))
-            }
-            return targets
-        }
 
     companion object {
         val supportedTargets = setOf(GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)

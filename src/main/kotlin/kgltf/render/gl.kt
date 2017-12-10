@@ -4,16 +4,39 @@ import org.joml.Matrix4f
 import org.joml.Matrix4fc
 import org.lwjgl.opengl.GL11.glDrawArrays
 import org.lwjgl.opengl.GL11.glDrawElements
-import org.lwjgl.opengl.GL15.glBindBuffer
+import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.glBindVertexArray
 
-class GLBufferView(val target: Int, val buffer: Int) {
+class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 
     fun bind() {
         glBindBuffer(target, buffer)
     }
+
+    fun init() {
+        glBufferData(target, byteLength.toLong(), GL_STATIC_DRAW)
+    }
+
+    fun copyBufferData(data: ByteArray, offset: Int = 0) {
+        val mappedBuffer = glMapBuffer(target, GL_WRITE_ONLY) ?: throw RuntimeException("Cannot allocate buffer")
+        mappedBuffer.put(
+                data,
+                offset,
+                byteLength
+        )
+        glUnmapBuffer(target)
+    }
+
+    fun unbind() {
+        glBindBuffer(target, 0)
+    }
+}
+
+fun GLBufferView.initWithData(data: ByteArray, offset: Int = 0) {
+    init()
+    copyBufferData(data, offset)
 }
 
 class GLAccessor(val bufferView: GLBufferView,

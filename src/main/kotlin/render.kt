@@ -17,16 +17,8 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
     private val startPrimitiveIndex = gltf.meshes.map { it.primitives.size }.sums()
-    private val drawables = ArrayList<() -> Unit>(primitivesNum)
 
     private val vertexArrayId = IntArray(primitivesNum)
-
-    private val color = FloatArray(4)
-
-    private val locations = mapOf("POSITION" to 0)
-
-    private val mvp = Matrix4f()
-    private val mvpArray = FloatArray(16)
 
     private val bufferViews = ArrayList<GLBufferView>(gltf.bufferViews.size)
     private val accessors = ArrayList<GLAccessor>(gltf.accessors.size)
@@ -61,22 +53,19 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private fun initBufferViews() {
         glGenBuffers(bufferId)
-        gltf.bufferViews.forEachIndexed { i, bufferView ->
-            with(bufferView) {
-                check(target in supportedTargets) { "Unsupported target" }
-                glBindBuffer(target, bufferId[i])
-                glBufferData(target, byteLength.toLong(), GL_STATIC_DRAW)
-                val mappedBuffer = glMapBuffer(target, GL_WRITE_ONLY) ?: throw RuntimeException("Cannot allocate buffer")
-                mappedBuffer.put(
-                        data.buffers[buffer],
-                        byteOffset,
-                        byteLength
-                )
-                glUnmapBuffer(target)
-                glBindBuffer(target, 0)
-                bufferViews.add(GLBufferView(target, bufferId[i]))
-            }
-        }
+        bufferViews.addAll(
+                gltf.bufferViews.mapIndexed { i, bufferView ->
+                    with(bufferView) {
+                        check(target in supportedTargets) { "Unsupported target" }
+                        val data = data.buffers[buffer]
+                        GLBufferView(target, bufferId[i], byteLength).apply {
+                            bind()
+                            initWithData(data, byteOffset)
+                            unbind()
+                        }
+                    }
+                }
+        )
     }
 
     private fun initAccessors() {
@@ -170,13 +159,13 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                         }
                     }
                     val camera = if (node.camera != null) cameras[node.camera] else null
-                    val node = GLNode(transform,
+                    val glNode = GLNode(transform,
                             mesh = if (node.mesh != null) meshes[node.mesh] else null,
                             camera = camera)
-                    if (node.camera != null) {
-                        cameraNodes.add(node)
+                    if (glNode.camera != null) {
+                        cameraNodes.add(glNode)
                     }
-                    node
+                    glNode
                 }
         )
     }

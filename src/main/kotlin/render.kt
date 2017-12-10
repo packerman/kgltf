@@ -209,27 +209,25 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     companion object {
         val supportedTargets = setOf(GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
 
+        val sizeInBytes = mapOf(GL_BYTE to 1,
+                GL_UNSIGNED_BYTE to 1,
+                GL_SHORT to 2,
+                GL_UNSIGNED_SHORT to 2,
+                GL_UNSIGNED_INT to 4,
+                GL_FLOAT to 4)
+
+        val numberOfComponents = mapOf("SCALAR" to 1,
+                "VEC2" to 2,
+                "VEC3" to 3,
+                "VEC4" to 4,
+                "MAT2" to 4,
+                "MAT3" to 9,
+                "MAT4" to 16)
+
         fun sizeInBytes(componentType: Int) =
-                when (componentType) {
-                    GL_BYTE -> 1
-                    GL_UNSIGNED_BYTE -> 1
-                    GL_SHORT -> 2
-                    GL_UNSIGNED_SHORT -> 2
-                    GL_UNSIGNED_INT -> 4
-                    GL_FLOAT -> 4
-                    else -> throw IllegalArgumentException("Unknown component type $componentType")
-                }
+                requireNotNull(sizeInBytes[componentType]) { "Unknown component type $componentType" }
 
         fun numberOfComponents(type: String) =
-                when (type) {
-                    "SCALAR" -> 1
-                    "VEC2" -> 2
-                    "VEC3" -> 3
-                    "VEC4" -> 4
-                    "MAT2" -> 4
-                    "MAT3" -> 9
-                    "MAT4" -> 16
-                    else -> throw IllegalArgumentException("Unknown type $type")
-                }
+                requireNotNull(numberOfComponents[type]) { "Unknown type $type" }
     }
 }

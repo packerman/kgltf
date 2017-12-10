@@ -3,7 +3,7 @@ package kgltf.render
 import kgltf.util.buildMap
 import kgltf.util.warn
 import org.joml.Matrix4fc
-import org.lwjgl.opengl.GL11.GL_FALSE
+import org.lwjgl.opengl.GL11.GL_TRUE
 import org.lwjgl.opengl.GL20.*
 import java.net.URL
 
@@ -65,9 +65,7 @@ fun linkProgram(shaders: IntArray): Int {
     }
     glLinkProgram(program)
     val status = glGetProgrami(program, GL_LINK_STATUS)
-    if (status == GL_FALSE) {
-        throw RuntimeException("Cannot link program: ${glGetProgramInfoLog(program)}")
-    }
+    check(status == GL_TRUE) { "Cannot link program: ${glGetProgramInfoLog(program)}" }
     return program
 }
 
@@ -76,9 +74,7 @@ fun compileShader(type: Int, source: String): Int {
     glShaderSource(shader, source)
     glCompileShader(shader)
     val status = glGetShaderi(shader, GL_COMPILE_STATUS)
-    if (status == GL_FALSE) {
-        throw RuntimeException("Cannot compile shader: ${glGetShaderInfoLog(shader)}")
-    }
+    check(status == GL_TRUE) { "Cannot compile shader: ${glGetShaderInfoLog(shader)}" }
     return shader
 }
 

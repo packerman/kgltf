@@ -57,7 +57,7 @@ fun downloadGltfData(uri: URI, root: Root, cache: Cache): GltfData {
                     "http" -> cache.bytes.get(bufferUri)
                     "https" -> cache.bytes.get(bufferUri)
                     "data" -> DataUri.encode(bufferUri)
-                    else -> throw IllegalStateException("Unknown scheme ${bufferUri.scheme}")
+                    else -> error("Unknown scheme ${bufferUri.scheme}")
                 }
                 check(data.size == buffer.byteLength)
                 data

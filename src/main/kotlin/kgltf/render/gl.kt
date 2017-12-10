@@ -20,12 +20,8 @@ class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
     }
 
     fun copyBufferData(data: ByteArray, offset: Int = 0) {
-        val mappedBuffer = glMapBuffer(target, GL_WRITE_ONLY) ?: throw RuntimeException("Cannot allocate buffer")
-        mappedBuffer.put(
-                data,
-                offset,
-                byteLength
-        )
+        val mappedBuffer = requireNotNull(glMapBuffer(target, GL_WRITE_ONLY)) { "Cannot allocate buffer" }
+        mappedBuffer.put(data, offset, byteLength)
         glUnmapBuffer(target)
     }
 

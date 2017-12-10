@@ -36,7 +36,7 @@ fun launch(app: Application, config: Config = Config()) {
     GLFWErrorCallback.createPrint(System.err).set()
 
     if (!glfwInit()) {
-        throw IllegalStateException("Unable to initialize GLFW")
+        error("Unable to initialize GLFW")
     }
 
     if (Platform.get() == Platform.MACOSX) {
@@ -50,9 +50,7 @@ fun launch(app: Application, config: Config = Config()) {
     }
 
     val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
-    if (window == NULL) {
-        throw RuntimeException("Failed to create the GLFW window")
-    }
+    check(window != NULL) { "Failed to create the GLFW window" }
     if (config.stickyKeys) {
         glfwSetInputMode(window, GLFW_STICKY_KEYS, 1)
     }

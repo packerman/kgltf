@@ -3,8 +3,10 @@ import kgltf.util.*
 import org.joml.Matrix4f
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.*
-import org.lwjgl.opengl.GL30.*
+import org.lwjgl.opengl.GL20.glUniform4fv
+import org.lwjgl.opengl.GL20.glUniformMatrix4fv
+import org.lwjgl.opengl.GL30.glDeleteVertexArrays
+import org.lwjgl.opengl.GL30.glGenVertexArrays
 
 class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
@@ -90,26 +92,16 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                 val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
                 mesh.primitives.forEachIndexed { j, primitive ->
                     val primitiveIndex = startPrimitiveIndex[i] + j
-                    glBindVertexArray(vertexArrayId[primitiveIndex])
-                    primitive.attributes.forEach { (attribute, accessorIndex) ->
-                        val accessor = accessors[accessorIndex]
-                        accessor.bufferView.bind()
-                        locations[attribute]?.let { location ->
-                            glEnableVertexAttribArray(location)
-                            accessor.setVertexAttribPointer(location)
-                        }
-                    }
                     val mode = primitive.mode ?: GL_TRIANGLES
                     val attributes = primitive.attributes.mapValues { accessors[it.value] }
                     val glPrimitive = if (primitive.indices != null) {
-                        val accessor = accessors[primitive.indices]
-                        accessor.bufferView.bind()
-                        GLPrimitiveIndex(vertexArrayId[primitiveIndex], mode, attributes, accessor)
+                        GLPrimitiveIndex(vertexArrayId[primitiveIndex], mode, attributes, accessors[primitive.indices])
                     } else {
                         GLPrimitive(vertexArrayId[primitiveIndex], mode, attributes)
                     }
-                    primitives.add(glPrimitive)
+                    glPrimitive.init(locations)
                     glPrimitive.unbind()
+                    primitives.add(glPrimitive)
                 }
                 meshes.add(GLMesh(primitives))
             }

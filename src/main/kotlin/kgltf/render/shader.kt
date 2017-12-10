@@ -10,14 +10,14 @@ import java.net.URL
 object Programs {
     val flat: Program by lazy {
         Program.build("flat",
-                attributes = setOf("position"),
-                uniforms = setOf("modelViewProjectionMatrix", "color")
+                attributes = setOf(AttributeName.POSITION),
+                uniforms = setOf(UniformName.MODEL_VIEW_PROJECTION_MATRIX, UniformName.COLOR)
         )
     }
     val normal: Program by lazy {
         Program.build("normal",
-                attributes = setOf("position", "normal"),
-                uniforms = setOf("modelViewProjectionMatrix", "normalMatrix")
+                attributes = setOf(AttributeName.POSITION, AttributeName.NORMAL),
+                uniforms = setOf(UniformName.MODEL_VIEW_PROJECTION_MATRIX, UniformName.NORMAL_MATRIX)
         )
     }
 }

@@ -1,10 +1,11 @@
 import kgltf.render.*
-import kgltf.util.*
+import kgltf.util.checkGLError
+import kgltf.util.sums
 import org.joml.Matrix4f
+import org.joml.Quaternionf
+import org.joml.Vector3f
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.glUniform4fv
-import org.lwjgl.opengl.GL20.glUniformMatrix4fv
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 import org.lwjgl.opengl.GL30.glGenVertexArrays
 
@@ -80,37 +81,57 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private fun initMeshes() {
         glGenVertexArrays(vertexArrayId)
-
         gltf.meshes.forEachIndexed { i, mesh ->
-            Programs.flat.use {
-                uniforms["mvp"]?.let { location ->
-                    glUniformMatrix4fv(location, false, mvp.get(mvpArray))
+            val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
+            mesh.primitives.forEachIndexed { j, primitive ->
+                val primitiveIndex = startPrimitiveIndex[i] + j
+                val mode = primitive.mode ?: GL_TRIANGLES
+                val attributes = primitive.attributes.mapValues { accessors[it.value] }
+                val glPrimitive = if (primitive.indices != null) {
+                    GLPrimitiveIndex(vertexArrayId[primitiveIndex], mode, attributes, accessors[primitive.indices])
+                } else {
+                    GLPrimitive(vertexArrayId[primitiveIndex], mode, attributes)
                 }
-                uniforms["color"]?.let { location ->
-                    glUniform4fv(location, Colors.GRAY.get(color))
-                }
-                val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
-                mesh.primitives.forEachIndexed { j, primitive ->
-                    val primitiveIndex = startPrimitiveIndex[i] + j
-                    val mode = primitive.mode ?: GL_TRIANGLES
-                    val attributes = primitive.attributes.mapValues { accessors[it.value] }
-                    val glPrimitive = if (primitive.indices != null) {
-                        GLPrimitiveIndex(vertexArrayId[primitiveIndex], mode, attributes, accessors[primitive.indices])
-                    } else {
-                        GLPrimitive(vertexArrayId[primitiveIndex], mode, attributes)
-                    }
-                    glPrimitive.init(locations)
-                    glPrimitive.unbind()
-                    primitives.add(glPrimitive)
-                }
-                meshes.add(GLMesh(primitives))
+                primitives.add(glPrimitive)
             }
+            val glMesh = GLMesh(primitives)
+            glMesh.init()
+            meshes.add(glMesh)
         }
     }
 
     private fun initNodes() {
         nodes.addAll(
-                gltf.nodes.map { GLNode(meshes[it.mesh]) }
+                gltf.nodes.map { node ->
+                    val hasTransformations = node.translation != null || node.rotation != null || node.scale != null
+                    require(node.matrix == null || !hasTransformations)
+                    val transform = Transform()
+                    when {
+                        node.matrix != null -> {
+                            require(node.matrix.size == 16)
+                            transform.matrix = Matrix4f(
+                                    node.matrix[0], node.matrix[1], node.matrix[2], node.matrix[3],
+                                    node.matrix[4], node.matrix[5], node.matrix[6], node.matrix[7],
+                                    node.matrix[8], node.matrix[9], node.matrix[10], node.matrix[11],
+                                    node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15])
+                        }
+                        hasTransformations -> {
+                            if (node.translation != null) {
+                                require(node.translation.size == 3)
+                                transform.translation = Vector3f(node.translation[0], node.translation[1], node.translation[2])
+                            }
+                            if (node.rotation != null) {
+                                require(node.rotation.size == 4)
+                                transform.rotation = Quaternionf(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3])
+                            }
+                            if (node.scale != null) {
+                                require(node.scale.size == 3)
+                                transform.scale = Vector3f(node.scale[0], node.scale[1], node.scale[2])
+                            }
+                        }
+                    }
+                    GLNode(meshes[node.mesh], transform)
+                }
         )
     }
 

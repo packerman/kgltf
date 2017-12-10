@@ -1,5 +1,6 @@
 package kgltf.render
 
+import org.joml.Matrix4f
 import org.lwjgl.opengl.GL11.glDrawArrays
 import org.lwjgl.opengl.GL11.glDrawElements
 import org.lwjgl.opengl.GL15.glBindBuffer
@@ -82,14 +83,57 @@ class GLPrimitiveIndex(vertexArray: Int,
 }
 
 class GLMesh(val primitives: List<GLPrimitive>) {
-    fun render() {
-        primitives.forEach(GLPrimitive::render)
+
+    private lateinit var program: Program
+    private lateinit var attributeLocations: Map<String, Int>
+
+    private val normalMatrix = Matrix4f()
+
+    fun init() {
+        val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
+        program = if (hasNormals) Programs.normal else Programs.flat
+        program.use {
+            attributeLocations = getSemanticAttributesLocation(this)
+            primitives.forEach { primitive ->
+                primitive.init(attributeLocations)
+                primitive.unbind()
+            }
+        }
+    }
+
+    fun render(transform: Transform) {
+        program.use {
+            uniforms[UniformName.MODEL_VIEW_PROJECTION_MATRIX]?.let { location ->
+                UniformSetter.set(location, transform.matrix)
+            }
+            uniforms[UniformName.NORMAL_MATRIX]?.let { location ->
+                UniformSetter.set(location, normalMatrix)
+            }
+            uniforms[UniformName.COLOR]?.let { location ->
+                UniformSetter.set(location, Colors.GRAY)
+            }
+            primitives.forEach(GLPrimitive::render)
+        }
+    }
+
+    companion object {
+        private val mapping = mapOf("POSITION" to AttributeName.POSITION,
+                "TEXCOORD_0" to "uv",
+                "NORMAL" to AttributeName.NORMAL)
+
+        fun getSemanticAttributesLocation(program: Program) = HashMap<String, Int>().apply {
+            for ((semanticAttribute, programAttribute) in mapping) {
+                program.attributes[programAttribute]?.let { location ->
+                    set(semanticAttribute, location)
+                }
+            }
+        }.toMap()
     }
 }
 
-class GLNode(val mesh: GLMesh) {
+class GLNode(val mesh: GLMesh, val transform: Transform) {
     fun render() {
-        mesh.render()
+        mesh.render(transform)
     }
 }
 

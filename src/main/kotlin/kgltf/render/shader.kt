@@ -1,14 +1,23 @@
-import org.lwjgl.opengl.GL11.GL_FALSE
-import org.lwjgl.opengl.GL20.*
+package kgltf.render
+
 import kgltf.util.buildMap
 import kgltf.util.warn
+import org.joml.Matrix4fc
+import org.lwjgl.opengl.GL11.GL_FALSE
+import org.lwjgl.opengl.GL20.*
 import java.net.URL
 
 object Programs {
     val flat: Program by lazy {
-        Program.create("flat",
+        Program.build("flat",
                 attributes = setOf("position"),
-                uniforms = setOf("mvp", "color")
+                uniforms = setOf("modelViewProjectionMatrix", "color")
+        )
+    }
+    val normal: Program by lazy {
+        Program.build("normal",
+                attributes = setOf("position", "normal"),
+                uniforms = setOf("modelViewProjectionMatrix", "normalMatrix")
         )
     }
 }
@@ -25,7 +34,7 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
     }
 
     companion object {
-        fun create(name: String, attributes: Set<String>, uniforms: Set<String>): Program {
+        fun build(name: String, attributes: Set<String>, uniforms: Set<String>): Program {
             val shaders = collectShadersForProgram(name)
             val program = linkProgram(shaders)
             shaders.forEach(::glDeleteShader)
@@ -74,3 +83,28 @@ fun compileShader(type: Int, source: String): Int {
 }
 
 fun compileShader(type: Int, source: URL) = compileShader(type, source.readText())
+
+
+object AttributeName {
+    const val POSITION = "position"
+    const val NORMAL = "normal"
+}
+
+object UniformName {
+    const val COLOR = "color"
+    const val MODEL_VIEW_PROJECTION_MATRIX = "modelViewProjectionMatrix"
+    const val NORMAL_MATRIX = "normalMatrix"
+}
+
+object UniformSetter {
+    private val color = FloatArray(4)
+    private val matrix4f = FloatArray(16)
+
+    fun set(location: Int, value: Matrix4fc) {
+        glUniformMatrix4fv(location, false, value.get(matrix4f))
+    }
+
+    fun set(location: Int, value: Color) {
+        glUniform4fv(location, value.get(color))
+    }
+}

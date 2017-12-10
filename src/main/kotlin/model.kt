@@ -21,7 +21,11 @@ data class Scene(val name: String?,
                  val nodes: List<Int>)
 
 data class Node(val name: String?,
-                val mesh: Int)
+                val mesh: Int,
+                val matrix: List<Float>?,
+                val rotation: List<Float>?,
+                val translation: List<Float>?,
+                val scale: List<Float>?)
 
 data class Mesh(val name: String?,
                 val primitives: List<Primitive>)

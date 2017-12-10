@@ -1,4 +1,4 @@
-package kgltf.util
+package kgltf.render
 
 import kotlin.math.max
 import kotlin.math.min

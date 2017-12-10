@@ -4,6 +4,7 @@ import com.google.gson.reflect.TypeToken
 data class Root(val scenes: List<Scene>,
                 val nodes: List<Node>,
                 val meshes: List<Mesh>,
+                val cameras: List<Camera>?,
                 val buffers: List<Buffer>,
                 val bufferViews: List<BufferView>,
                 val accessors: List<Accessor>,
@@ -21,11 +22,20 @@ data class Scene(val name: String?,
                  val nodes: List<Int>)
 
 data class Node(val name: String?,
-                val mesh: Int,
+                val mesh: Int?,
+                val camera: Int?,
                 val matrix: List<Float>?,
                 val rotation: List<Float>?,
                 val translation: List<Float>?,
                 val scale: List<Float>?)
+
+data class Camera(val type: String,
+                  val perspective: Perspective?,
+                  val orthographic: Orthographic?)
+
+data class Perspective(val aspectRatio: Float, val yfov: Float, val znear: Float, val zfar: Float?)
+
+data class Orthographic(val xmag: Float, val ymag: Float, val znear: Float, val zfar: Float)
 
 data class Mesh(val name: String?,
                 val primitives: List<Primitive>)

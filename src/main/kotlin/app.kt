@@ -7,7 +7,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 fun main(args: Array<String>) {
-    val uri = getSampleModelUri(KhronosSample.SimpleMeshes, Gltf)
+    val uri = getSampleModelUri(KhronosSample.Cameras, Gltf)
 
     val app = Cache().use { cache ->
         val gltf = Root.load(cache.strings.get(uri))
@@ -25,7 +25,8 @@ fun main(args: Array<String>) {
 enum class KhronosSample(_alternateName: String? = null) {
     TriangleWithoutIndices,
     Triangle,
-    SimpleMeshes;
+    SimpleMeshes,
+    Cameras;
 
     val sampleName: String = _alternateName ?: name
 

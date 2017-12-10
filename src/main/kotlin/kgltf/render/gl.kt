@@ -1,13 +1,13 @@
 package kgltf.render
 
 import org.joml.Matrix4f
+import org.joml.Matrix4fc
 import org.lwjgl.opengl.GL11.glDrawArrays
 import org.lwjgl.opengl.GL11.glDrawElements
 import org.lwjgl.opengl.GL15.glBindBuffer
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.glBindVertexArray
-import java.util.logging.Logger
 
 class GLBufferView(val target: Int, val buffer: Int) {
 
@@ -88,6 +88,8 @@ class GLMesh(val primitives: List<GLPrimitive>) {
     private lateinit var attributeLocations: Map<String, Int>
 
     private val normalMatrix = Matrix4f()
+    private val modelViewProjectionMatrix = Matrix4f()
+    private val modelViewMatrix = Matrix4f()
 
     fun init() {
         val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
@@ -101,12 +103,17 @@ class GLMesh(val primitives: List<GLPrimitive>) {
         }
     }
 
-    fun render(transform: Transform) {
+    fun render(modelTransform: Transform, cameraTransform: CameraTransform) {
         program.use {
             uniforms[UniformName.MODEL_VIEW_PROJECTION_MATRIX]?.let { location ->
-                UniformSetter.set(location, transform.matrix)
+                modelViewProjectionMatrix.set(cameraTransform.projectionViewMatrix)
+                        .mul(modelTransform.matrix)
+                UniformSetter.set(location, modelViewProjectionMatrix)
             }
+            modelViewMatrix.set(cameraTransform.viewMatrix)
+                    .mul(modelTransform.matrix)
             uniforms[UniformName.NORMAL_MATRIX]?.let { location ->
+                normalMatrix.set(modelViewMatrix).invert().transpose()
                 UniformSetter.set(location, normalMatrix)
             }
             uniforms[UniformName.COLOR]?.let { location ->
@@ -131,16 +138,57 @@ class GLMesh(val primitives: List<GLPrimitive>) {
     }
 }
 
-class GLNode(val mesh: GLMesh, val transform: Transform) {
-    fun render() {
-        mesh.render(transform)
+class GLNode(val transform: Transform,
+             val mesh: GLMesh? = null,
+             val camera: Camera? = null) {
+
+    fun render(cameraTransform: CameraTransform) {
+        mesh?.render(transform, cameraTransform)
+    }
+
+    companion object {
+        internal val defaultCameraNode = GLNode(camera = IdentityCamera(), transform = Transform())
     }
 }
 
 class GLScene(val nodes: List<GLNode>) {
-    fun render() {
-        nodes.forEach(GLNode::render)
+    fun render(cameraTransform: CameraTransform) {
+        nodes.forEach { it.render(cameraTransform) }
     }
 }
 
-private val logger = Logger.getLogger("kgltf.gl")
+class CameraTransform {
+
+    private val _viewMatrix = Matrix4f()
+    val viewMatrix: Matrix4fc = _viewMatrix
+
+    private val _projectionViewMatrix = Matrix4f()
+    val projectionViewMatrix: Matrix4fc = _projectionViewMatrix
+
+    fun set(camera: Camera, transform: Transform) {
+        _projectionViewMatrix
+                .set(camera.projectionMatrix)
+                .mul(transform.matrix.invert(_viewMatrix))
+    }
+}
+
+class Renderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>) {
+
+    private val cameraTransforms = CameraTransform()
+
+    fun render(sceneNum: Int, cameraNum: Int? = null) {
+        require((cameraNum == null && cameraNodes.isEmpty()) ||
+                (cameraNum != null && (cameraNum in 0 until cameraNodes.size)))
+        require(sceneNum in 0 until scenes.size)
+
+        val cameraNode = if (cameraNum != null) cameraNodes[cameraNum] else GLNode.defaultCameraNode
+
+        render(scenes[sceneNum], cameraNode)
+    }
+
+    private fun render(scene: GLScene, cameraNode: GLNode) {
+        val camera = requireNotNull(cameraNode.camera)
+        cameraTransforms.set(camera, cameraNode.transform)
+        scene.render(cameraTransforms)
+    }
+}

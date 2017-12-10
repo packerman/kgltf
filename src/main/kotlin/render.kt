@@ -1,9 +1,11 @@
 import kgltf.render.*
+import kgltf.render.Camera
 import kgltf.util.checkGLError
 import kgltf.util.sums
 import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
+import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
@@ -32,13 +34,24 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     private val nodes = ArrayList<GLNode>(gltf.nodes.size)
     private val scenes = ArrayList<GLScene>(gltf.scenes.size)
 
+    private val camerasNum = gltf.cameras?.size ?: 0
+    private val cameras = ArrayList<Camera>(camerasNum)
+    private val cameraNodes = ArrayList<GLNode>(camerasNum)
+
+    private lateinit var renderer: Renderer
+
+    private var cameraIndex = 0
+    private var sceneIndex = 0
+
     override fun init() {
         setClearColor(Colors.BLACK)
         initBufferViews()
         initAccessors()
         initMeshes()
+        initCameras()
         initNodes()
         initScenes()
+        renderer = Renderer(scenes, cameraNodes)
         checkGLError()
     }
 
@@ -100,6 +113,32 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
         }
     }
 
+    private fun initCameras() {
+        cameras.addAll(
+                gltf.cameras?.map { camera ->
+                    require((camera.type == "perspective" && camera.perspective != null && camera.orthographic == null) ||
+                            (camera.type == "orthographic" && camera.orthographic != null && camera.perspective == null))
+                    when {
+                        camera.perspective != null -> {
+                            with(camera.perspective) {
+                                if (zfar != null) {
+                                    PerspectiveCamera(aspectRatio, yfov, znear, zfar)
+                                } else {
+                                    PerspectiveCamera(aspectRatio, yfov, znear)
+                                }
+                            }
+                        }
+                        camera.orthographic != null -> {
+                            with(camera.orthographic) {
+                                OrthographicCamera(xmag, ymag, znear, zfar)
+                            }
+                        }
+                        else -> error("Unknown camera type")
+                    }
+                } ?: emptyList()
+        )
+    }
+
     private fun initNodes() {
         nodes.addAll(
                 gltf.nodes.map { node ->
@@ -130,7 +169,14 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
                             }
                         }
                     }
-                    GLNode(meshes[node.mesh], transform)
+                    val camera = if (node.camera != null) cameras[node.camera] else null
+                    val node = GLNode(transform,
+                            mesh = if (node.mesh != null) meshes[node.mesh] else null,
+                            camera = camera)
+                    if (node.camera != null) {
+                        cameraNodes.add(node)
+                    }
+                    node
                 }
         )
     }
@@ -145,8 +191,10 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     override fun render() {
         glClear(GL_COLOR_BUFFER_BIT)
-        Programs.flat.use {
-            scenes[0].render()
+        if (cameraNodes.isEmpty()) {
+            renderer.render(sceneIndex)
+        } else {
+            renderer.render(sceneIndex, cameraIndex)
         }
         checkGLError()
     }
@@ -158,6 +206,15 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     override fun shutdown() {
         glDeleteBuffers(bufferId)
         glDeleteVertexArrays(vertexArrayId)
+    }
+
+    override fun onKey(key: Int, action: Int, x: Double, y: Double) {
+        when {
+            key == GLFW_KEY_C && action == GLFW_PRESS -> if (cameraNodes.isNotEmpty()) {
+                cameraIndex = (cameraIndex + 1) % cameraNodes.size
+            }
+            key == GLFW_KEY_S && action == GLFW_PRESS -> sceneIndex = (sceneIndex + 1) % scenes.size
+        }
     }
 
     companion object {

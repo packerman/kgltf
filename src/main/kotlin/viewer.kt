@@ -194,6 +194,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : Application
     }
 
     override fun resize(width: Int, height: Int) {
+        logger.info { "resize $width $height" }
         glViewport(0, 0, width, height)
     }
 

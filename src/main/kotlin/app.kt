@@ -17,9 +17,9 @@ fun main(args: Array<String>) {
         val config = Config(width = 1024,
                 height = 640,
                 title = "glTF")
-        launch(config) { window ->
-            GltfViewer(window, gltf, data)
-        }
+        val viewerCreator = { window: Long -> GltfViewer(window, gltf, data) }
+
+        Launcher.loop(config, viewerCreator)
     }
 }
 

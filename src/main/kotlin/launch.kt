@@ -30,8 +30,8 @@ abstract class Application(protected val window: Long) {
         return glfwGetKey(window, key)
     }
 
-    fun screenshot(prefix: String): File {
-        return saveScreenshot(prefix, window)
+    fun screenshot(fileName: String): File {
+        return saveScreenshot(fileName, window)
     }
 }
 

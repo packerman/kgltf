@@ -10,6 +10,8 @@ import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 import org.lwjgl.opengl.GL30.glGenVertexArrays
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
 
 class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : Application(window) {
@@ -208,7 +210,11 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : Application
             }
             keyPressed(GLFW_KEY_S) -> sceneIndex = (sceneIndex + 1) % scenes.size
             keyPressed(GLFW_KEY_P) -> {
-                val savedFile = screenshot("screenshot")
+                val current = LocalDateTime.now()
+                val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
+                val formatted = current.format(formatter)
+                val fileName = "screenshot_$formatted.png"
+                val savedFile = screenshot(fileName)
                 logger.info("Saved screenshot to ${savedFile}")
             }
         }

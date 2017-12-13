@@ -7,8 +7,6 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import java.io.File
 import java.nio.ByteBuffer
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 fun makeScreenshot(width: Int, height: Int, buffer: ByteBuffer, format: Int = GL_RGBA): ByteBuffer {
     glReadPixels(0, 0, width, height, format, GL_UNSIGNED_BYTE, buffer)
@@ -21,21 +19,13 @@ private fun makeScreenshot(width: Int, height: Int, format: Int = GL_RGBA): Byte
     return makeScreenshot(width, height, buffer, format)
 }
 
-private inline fun <R> ByteBuffer.ensureFree(block: (ByteBuffer) -> R): R {
-    try {
-        return block(this)
-    } finally {
-        MemoryUtil.memFree(this)
-    }
-}
-
 fun makeScreenshot(window: Long, format: Int = GL_RGBA): ByteArray {
     require(isSupportedFormat(format))
     MemoryStack.stackPush().use { stack ->
         val width = stack.mallocInt(1)
         val height = stack.mallocInt(1)
         glfwGetFramebufferSize(window, width, height)
-        makeScreenshot(width[0], height[0], format).ensureFree { buffer ->
+        makeScreenshot(width[0], height[0], format).ensureMemoryFree { buffer ->
             val byteArray = ByteArray(buffer.capacity())
             buffer.get(byteArray)
             return byteArray
@@ -43,26 +33,34 @@ fun makeScreenshot(window: Long, format: Int = GL_RGBA): ByteArray {
     }
 }
 
-fun saveScreenshot(prefix: String, window: Long, format: Int = GL_RGBA): File {
+fun saveScreenshot(fileName: String, window: Long, format: Int = GL_RGBA): File {
     require(isSupportedFormat(format))
     MemoryStack.stackPush().use { stack ->
         val width = stack.mallocInt(1)
         val height = stack.mallocInt(1)
         glfwGetFramebufferSize(window, width, height)
-        makeScreenshot(width[0], height[0], format).ensureFree { buffer ->
+        makeScreenshot(width[0], height[0], format).ensureMemoryFree { image ->
             val channels = getBytesPerPixel(format)
-            val fileName = getFileName(prefix)
-            stbi_write_png(fileName, width[0], height[0], channels, buffer, 0)
-            return File(fileName).absoluteFile
+            val byteStride = width[0] * channels
+            MemoryUtil.memAlloc(height[0] * byteStride).ensureMemoryFree { flippedImage ->
+                flipImage(image, height[0], byteStride, flippedImage)
+                stbi_write_png(fileName, width[0], height[0], channels, flippedImage, byteStride)
+            }
         }
     }
+    return File(fileName).absoluteFile
 }
 
-private fun getFileName(prefix: String): String {
-    val current = LocalDateTime.now()
-    val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
-    val formatted = current.format(formatter)
-    return "${prefix}_$formatted.png"
+private fun flipImage(src: ByteBuffer, height: Int, byteStride: Int, dest: ByteBuffer): ByteBuffer {
+    val rowData = ByteArray(byteStride)
+    val destPositions = (0 until height).map { it * byteStride }.reversed()
+    destPositions.forEach { destPosition ->
+        dest.position(destPosition)
+        src.get(rowData)
+        dest.put(rowData)
+    }
+    dest.rewind()
+    return dest
 }
 
 private fun getBytesPerPixel(format: Int): Int {
@@ -76,3 +74,10 @@ private val bytesPerPixel = mapOf(
         GL_RGBA to 4
 )
 
+private inline fun <R> ByteBuffer.ensureMemoryFree(block: (ByteBuffer) -> R): R {
+    try {
+        return block(this)
+    } finally {
+        MemoryUtil.memFree(this)
+    }
+}

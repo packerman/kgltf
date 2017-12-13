@@ -1,3 +1,4 @@
+import kgltf.util.saveScreenshot
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWErrorCallback
@@ -8,12 +9,14 @@ import org.lwjgl.opengl.GLUtil
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
+import java.io.File
 import java.io.IOException
 import java.util.logging.Level
 import java.util.logging.LogManager
 import java.util.logging.Logger
 
-abstract class Application {
+abstract class Application(protected val window: Long) {
+
     open fun init() {}
     abstract fun render()
     open fun resize(width: Int, height: Int) {}
@@ -22,6 +25,14 @@ abstract class Application {
     open fun onMouse(button: Int, action: Int, x: Double, y: Double) {}
     open fun onMouseMove(x: Double, y: Double) {}
     open fun onKey(key: Int, action: Int, x: Double, y: Double) {}
+
+    fun getKeyState(key: Int): Int {
+        return glfwGetKey(window, key)
+    }
+
+    fun screenshot(prefix: String): File {
+        return saveScreenshot(prefix, window)
+    }
 }
 
 data class Config(val width: Int = 640,
@@ -30,7 +41,7 @@ data class Config(val width: Int = 640,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
-fun launch(app: Application, config: Config = Config()) {
+fun launch(config: Config = Config(), appCreator: (Long) -> Application): Long {
     LoggingConfiguration.setUp()
 
     GLFWErrorCallback.createPrint(System.err).set()
@@ -49,7 +60,7 @@ fun launch(app: Application, config: Config = Config()) {
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
     }
 
-    val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
+    val window: Long = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
     check(window != NULL) { "Failed to create the GLFW window" }
     if (config.stickyKeys) {
         glfwSetInputMode(window, GLFW_STICKY_KEYS, 1)
@@ -73,6 +84,7 @@ fun launch(app: Application, config: Config = Config()) {
     logger.config { "GL version: ${glGetString(GL_VERSION)}" }
     logger.config { "GLSL version: ${glGetString(GL_SHADING_LANGUAGE_VERSION)}" }
 
+    val app = appCreator(window)
     try {
         stackPush().use { stack ->
             val width = stack.mallocInt(1)
@@ -124,6 +136,7 @@ fun launch(app: Application, config: Config = Config()) {
         glfwTerminate()
         glfwSetErrorCallback(null).free()
     }
+    return window
 }
 
 object LoggingConfiguration {

@@ -9,17 +9,18 @@ import java.util.concurrent.Future
 fun main(args: Array<String>) {
     val uri = getSampleModelUri(KhronosSample.Cameras, Gltf)
 
-    val app = Cache().use { cache ->
+    Cache().use { cache ->
         val gltf = Root.load(cache.strings.get(uri))
         val data = downloadGltfData(uri, gltf, cache)
-        GltfViewer(gltf, data)
+        cache.flush()
+
+        val config = Config(width = 1024,
+                height = 640,
+                title = "glTF")
+        launch(config) { window ->
+            GltfViewer(window, gltf, data)
+        }
     }
-
-    val config = Config(width = 1024,
-            height = 640,
-            title = "glTF")
-
-    launch(app, config)
 }
 
 enum class KhronosSample(_alternateName: String? = null) {

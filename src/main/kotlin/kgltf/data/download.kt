@@ -38,8 +38,12 @@ class Cache : Closeable {
         override fun write(file: File, data: ByteArray) = file.writeBytes(data)
     }
 
-    override fun close() {
+    fun flush() {
         saveEntries(entriesFile, entries)
+    }
+
+    override fun close() {
+        flush()
     }
 
     inner abstract class InnerCache<T> {

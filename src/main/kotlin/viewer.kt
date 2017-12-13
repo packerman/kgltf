@@ -10,8 +10,9 @@ import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 import org.lwjgl.opengl.GL30.glGenVertexArrays
+import java.util.logging.Logger
 
-class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
+class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : Application(window) {
 
     private val bufferId = IntArray(gltf.bufferViews.size)
 
@@ -34,6 +35,8 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private var cameraIndex = 0
     private var sceneIndex = 0
+
+    private val logger = Logger.getLogger("kgltf.viewer")
 
     override fun init() {
         setClearColor(Colors.BLACK)
@@ -198,11 +201,16 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     }
 
     override fun onKey(key: Int, action: Int, x: Double, y: Double) {
+        fun keyPressed(keySymbol: Int) = key == keySymbol && action == GLFW_PRESS
         when {
-            key == GLFW_KEY_C && action == GLFW_PRESS -> if (cameraNodes.isNotEmpty()) {
+            keyPressed(GLFW_KEY_C) -> if (cameraNodes.isNotEmpty()) {
                 cameraIndex = (cameraIndex + 1) % cameraNodes.size
             }
-            key == GLFW_KEY_S && action == GLFW_PRESS -> sceneIndex = (sceneIndex + 1) % scenes.size
+            keyPressed(GLFW_KEY_S) -> sceneIndex = (sceneIndex + 1) % scenes.size
+            keyPressed(GLFW_KEY_P) -> {
+                val savedFile = screenshot("screenshot")
+                logger.info("Saved screenshot to ${savedFile}")
+            }
         }
     }
 

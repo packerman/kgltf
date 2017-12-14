@@ -1,3 +1,5 @@
+package kgltf.glfw
+
 import kgltf.util.saveScreenshot
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
 import org.lwjgl.glfw.GLFW.*
@@ -5,8 +7,6 @@ import org.lwjgl.glfw.GLFWErrorCallback
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL20.GL_SHADING_LANGUAGE_VERSION
-import org.lwjgl.opengl.GLUtil
-import org.lwjgl.system.Callback
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
@@ -42,14 +42,11 @@ data class Config(val width: Int = 640,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
-class Launcher private constructor(val config: Config, val appCreator: (Long) -> Application) {
+abstract class Launcher(val config: Config) : Runnable {
 
-    private var window: Long = NULL
-    private lateinit var app: Application
+    protected abstract fun createApplication(window: Long): Application
 
-    private var debugProc: Callback? = null
-
-    private fun initialize() {
+    override fun run() {
         LoggingConfiguration.setUp()
 
         GLFWErrorCallback.createPrint(System.err).set()
@@ -57,7 +54,22 @@ class Launcher private constructor(val config: Config, val appCreator: (Long) ->
         if (!glfwInit()) {
             error("Unable to initialize GLFW")
         }
+        val window: Long = createWindow()
+        val runtime = Runtime(window, createApplication(window))
 
+        try {
+            runtime.initApplication()
+            runtime.setUpApplicationCallbacks()
+
+            while (!glfwWindowShouldClose(window)) {
+                runtime.display()
+            }
+        } finally {
+            runtime.dispose()
+        }
+    }
+
+    private fun createWindow(): Long {
         if (Platform.get() == Platform.MACOSX) {
             glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
             glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
@@ -68,7 +80,7 @@ class Launcher private constructor(val config: Config, val appCreator: (Long) ->
             glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
         }
 
-        window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
+        val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
         check(window != NULL) { "Failed to create the GLFW window" }
         if (config.stickyKeys) {
             glfwSetInputMode(window, GLFW_STICKY_KEYS, 1)
@@ -81,89 +93,66 @@ class Launcher private constructor(val config: Config, val appCreator: (Long) ->
         glfwShowWindow(window)
 
         GL.createCapabilities()
-        debugProc = GLUtil.setupDebugMessageCallback()
-        when {
-            debugProc != null -> logger.info("Enabled GL debug mode")
-            config.glDebug -> logger.warning("Failed to enable GL debug mode")
-        }
 
         logger.config { "GL vendor: ${glGetString(GL_VENDOR)}" }
         logger.config { "GL renderer: ${glGetString(GL_RENDERER)}" }
         logger.config { "GL version: ${glGetString(GL_VERSION)}" }
         logger.config { "GLSL version: ${glGetString(GL_SHADING_LANGUAGE_VERSION)}" }
-
-        app = appCreator(window)
-
-        stackPush().use { stack ->
-            val width = stack.mallocInt(1)
-            val pHeight = stack.mallocInt(1)
-            glfwGetFramebufferSize(window, width, pHeight)
-
-            app.init()
-            app.resize(width[0], pHeight[0])
-        }
-
-        val xPos = DoubleArray(1)
-        val yPos = DoubleArray(1)
-
-        glfwSetKeyCallback(window) { _, key, _, action, _ ->
-            glfwGetCursorPos(window, xPos, yPos)
-            app.onKey(key, action, xPos[0], yPos[0])
-        }
-
-        glfwSetCursorPosCallback(window) { _, x, y ->
-            app.onMouseMove(x, y)
-        }
-
-        glfwSetMouseButtonCallback(window) { _, button, action, _ ->
-            glfwGetCursorPos(window, xPos, yPos)
-            app.onMouse(button, action, xPos[0], yPos[0])
-        }
-
-        glfwSetFramebufferSizeCallback(window) { _, width, height ->
-            logger.config { "resize ${width}x$height" }
-            app.resize(width, height)
-        }
+        return window
     }
 
-    fun display() {
-        app.render()
+    private class Runtime(val window: Long, val app: Application) {
 
-        glfwSwapBuffers(window)
-        glfwPollEvents()
+        fun initApplication() {
+            stackPush().use { stack ->
+                val width = stack.mallocInt(1)
+                val pHeight = stack.mallocInt(1)
+                glfwGetFramebufferSize(window, width, pHeight)
 
-    }
-
-    private fun dispose() {
-        app.shutdown()
-
-        debugProc?.free()
-
-        glfwFreeCallbacks(window)
-        glfwDestroyWindow(window)
-
-        glfwTerminate()
-        glfwSetErrorCallback(null).free()
-    }
-
-    companion object {
-
-        fun loop(config: Config, appCreator: (Long) -> Application) {
-            custom(config, appCreator) { launcher ->
-                while (!glfwWindowShouldClose(launcher.window)) {
-                    launcher.display()
-                }
+                app.init()
+                app.resize(width[0], pHeight[0])
             }
         }
 
-        fun custom(config: Config, appCreator: (Long) -> Application, block: (Launcher) -> Unit) {
-            val launcher = Launcher(config, appCreator)
-            try {
-                launcher.initialize()
-                block(launcher)
-            } finally {
-                launcher.dispose()
+        fun setUpApplicationCallbacks() {
+            val xPos = DoubleArray(1)
+            val yPos = DoubleArray(1)
+
+            glfwSetKeyCallback(window) { _, key, _, action, _ ->
+                glfwGetCursorPos(window, xPos, yPos)
+                app.onKey(key, action, xPos[0], yPos[0])
             }
+
+            glfwSetCursorPosCallback(window) { _, x, y ->
+                app.onMouseMove(x, y)
+            }
+
+            glfwSetMouseButtonCallback(window) { _, button, action, _ ->
+                glfwGetCursorPos(window, xPos, yPos)
+                app.onMouse(button, action, xPos[0], yPos[0])
+            }
+
+            glfwSetFramebufferSizeCallback(window) { _, width, height ->
+                logger.config { "resize ${width}x$height" }
+                app.resize(width, height)
+            }
+        }
+
+        fun display() {
+            app.render()
+
+            glfwSwapBuffers(window)
+            glfwPollEvents()
+        }
+
+        fun dispose() {
+            app.shutdown()
+
+            glfwFreeCallbacks(window)
+            glfwDestroyWindow(window)
+
+            glfwTerminate()
+            glfwSetErrorCallback(null).free()
         }
     }
 }
@@ -175,7 +164,7 @@ object LoggingConfiguration {
             try {
                 LogManager.getLogManager().readConfiguration(inputStream)
             } catch (e: IOException) {
-                Logger.getGlobal().log(Level.SEVERE, e) { "Cannot read logging configuration from file: $filePath" }
+                Logger.getGlobal().log(Level.SEVERE, e) { "Cannot read logging configuration from file: ${filePath}" }
             }
         }
     }

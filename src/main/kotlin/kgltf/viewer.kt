@@ -1,5 +1,8 @@
+package kgltf
+
+import kgltf.glfw.Application
+import kgltf.gltf.Root
 import kgltf.render.*
-import kgltf.render.Camera
 import kgltf.util.checkGLError
 import kgltf.util.sums
 import org.joml.Matrix4f
@@ -13,6 +16,8 @@ import org.lwjgl.opengl.GL30.glGenVertexArrays
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
+
+data class GltfData(val buffers: List<ByteArray>)
 
 class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : Application(window) {
 

@@ -1,5 +1,6 @@
-package kgltf.glfw
+package kgltf.app.glfw
 
+import kgltf.util.makeScreenshot
 import kgltf.util.saveScreenshot
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
 import org.lwjgl.glfw.GLFW.*
@@ -16,22 +17,48 @@ import java.util.logging.Level
 import java.util.logging.LogManager
 import java.util.logging.Logger
 
-abstract class Application(protected val window: Long) {
+interface Application {
+    fun init()
+    fun render()
+    fun resize(width: Int, height: Int)
 
-    open fun init() {}
-    abstract fun render()
-    open fun resize(width: Int, height: Int) {}
-    open fun shutdown() {}
+    fun shutdown()
 
-    open fun onMouse(button: Int, action: Int, x: Double, y: Double) {}
-    open fun onMouseMove(x: Double, y: Double) {}
-    open fun onKey(key: Int, action: Int, x: Double, y: Double) {}
+    fun stop()
 
-    fun getKeyState(key: Int): Int {
+    fun onMouse(button: Int, action: Int, x: Double, y: Double)
+
+    fun onMouseMove(x: Double, y: Double)
+
+    fun onKey(key: Int, action: Int, x: Double, y: Double)
+    fun getKeyState(key: Int): Int
+    fun screenshot(): ByteArray
+    fun screenshot(fileName: String): File
+}
+
+abstract class GlfwApplication(protected val window: Long) : Application {
+
+    override fun init() {}
+    override fun resize(width: Int, height: Int) {}
+    override fun shutdown() {}
+
+    override fun stop() {
+        glfwSetWindowShouldClose(window, true)
+    }
+
+    override fun onMouse(button: Int, action: Int, x: Double, y: Double) {}
+    override fun onMouseMove(x: Double, y: Double) {}
+    override fun onKey(key: Int, action: Int, x: Double, y: Double) {}
+
+    override fun getKeyState(key: Int): Int {
         return glfwGetKey(window, key)
     }
 
-    fun screenshot(fileName: String): File {
+    override fun screenshot(): ByteArray {
+        return makeScreenshot(window)
+    }
+
+    override fun screenshot(fileName: String): File {
         return saveScreenshot(fileName, window)
     }
 }
@@ -39,14 +66,13 @@ abstract class Application(protected val window: Long) {
 data class Config(val width: Int = 640,
                   val height: Int = 480,
                   val title: String = "",
+                  val visible: Boolean = true,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
-abstract class Launcher(val config: Config) : Runnable {
+class Launcher(val config: Config) {
 
-    protected abstract fun createApplication(window: Long): Application
-
-    override fun run() {
+    fun run(createApplication: (Long) -> Application) {
         LoggingConfiguration.setUp()
 
         GLFWErrorCallback.createPrint(System.err).set()
@@ -90,7 +116,9 @@ abstract class Launcher(val config: Config) : Runnable {
 
         glfwSwapInterval(1)
 
-        glfwShowWindow(window)
+        if (config.visible) {
+            glfwShowWindow(window)
+        }
 
         GL.createCapabilities()
 

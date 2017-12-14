@@ -1,6 +1,6 @@
-package kgltf
+package kgltf.app
 
-import kgltf.glfw.Application
+import kgltf.app.glfw.GlfwApplication
 import kgltf.gltf.Root
 import kgltf.render.*
 import kgltf.util.checkGLError
@@ -17,9 +17,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
 
-data class GltfData(val buffers: List<ByteArray>)
-
-class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : Application(window) {
+class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplication(window) {
 
     private val bufferId = IntArray(gltf.bufferViews.size)
 

@@ -1,38 +1,32 @@
-import Variant.Gltf
-import kgltf.GltfData
-import kgltf.GltfViewer
+package kgltf.app
+
+import kgltf.app.glfw.Application
 import kgltf.data.Cache
 import kgltf.data.DataUri
-import kgltf.glfw.Application
-import kgltf.glfw.Config
-import kgltf.glfw.Launcher
+import kgltf.app.glfw.GlfwApplication
+import kgltf.app.glfw.Config
+import kgltf.app.glfw.Launcher
 import kgltf.gltf.Root
 import java.net.URI
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
-fun main(args: Array<String>) {
-    val uri = getSampleModelUri(KhronosSample.Cameras, Gltf)
-
-    val config = Config(width = 1024,
-            height = 640,
-            title = "glTF")
-
-    ApplicationRunner(config).runFor(uri)
-}
-
 class ApplicationRunner(val config: Config) {
 
     fun runFor(uri: URI) {
+        runByDelegate(uri) { it }
+    }
+
+    fun runByDelegate(uri: URI, delegateCreator: (Application) -> Application) {
         Cache().use { cache ->
             val gltf = Root.load(cache.strings.get(uri))
             val data = downloadGltfData(uri, gltf, cache)
             cache.flush()
 
-            object : Launcher(config) {
-                override fun createApplication(window: Long): Application = GltfViewer(window, gltf, data)
-            }.run()
+            Launcher(config).run { window: Long ->
+                delegateCreator(GltfViewer(window, gltf, data))
+            }
         }
     }
 
@@ -60,25 +54,4 @@ class ApplicationRunner(val config: Config) {
     }
 }
 
-enum class KhronosSample(_alternateName: String? = null) {
-    TriangleWithoutIndices,
-    Triangle,
-    SimpleMeshes,
-    Cameras;
-
-    val sampleName: String = _alternateName ?: name
-
-    override fun toString() = sampleName
-}
-
-enum class Variant(val value: String) {
-    Gltf("glTF"),
-    GltfEmbedded("glTF-Embedded");
-
-    override fun toString() = value
-}
-
-fun getSampleModelUri(sample: KhronosSample, variant: Variant = Gltf): URI {
-    return URI("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/$sample/$variant/$sample.gltf")
-}
-
+data class GltfData(val buffers: List<ByteArray>)

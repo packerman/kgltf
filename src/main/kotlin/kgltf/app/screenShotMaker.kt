@@ -1,7 +1,6 @@
 package kgltf.app
 
 import kgltf.app.glfw.Application
-import kgltf.app.glfw.GlfwApplication
 import kgltf.app.glfw.Config
 import java.io.File
 import java.nio.file.Paths
@@ -9,7 +8,7 @@ import java.nio.file.Paths
 fun main(args: Array<String>) {
 
     fun runWithConfig(config: Config) {
-        val dir = Paths.get("images", "${config.width}x${config.height}").toFile()
+        val dir = Paths.get("screenshot_images", "${config.width}x${config.height}").toFile()
         dir.mkdirs()
         val runner = ApplicationRunner(config)
         KhronosSample.values().forEach { sample ->

@@ -112,7 +112,7 @@ class GLMesh(val primitives: List<GLPrimitive>) {
 
     fun init() {
         val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
-        program = if (hasNormals) Programs.normal else Programs.flat
+        program = if (hasNormals) Programs["normal"] else Programs["flat"]
         program.use {
             attributeLocations = getSemanticAttributesLocation(this)
             primitives.forEach { primitive ->

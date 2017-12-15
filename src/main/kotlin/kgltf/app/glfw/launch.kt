@@ -106,6 +106,8 @@ class Launcher(val config: Config) {
             glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
         }
 
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
+
         val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
         check(window != NULL) { "Failed to create the GLFW window" }
         if (config.stickyKeys) {

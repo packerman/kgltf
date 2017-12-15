@@ -204,6 +204,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     override fun shutdown() {
         glDeleteBuffers(bufferId)
         glDeleteVertexArrays(vertexArrayId)
+        Programs.clear()
     }
 
     override fun onKey(key: Int, action: Int, x: Double, y: Double) {

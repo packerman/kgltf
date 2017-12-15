@@ -18,49 +18,38 @@ import java.util.logging.LogManager
 import java.util.logging.Logger
 
 interface Application {
+    val window: Long
+
     fun init()
     fun render()
     fun resize(width: Int, height: Int)
 
     fun shutdown()
 
-    fun stop()
+    fun stop() {
+        glfwSetWindowShouldClose(window, true)
+    }
 
     fun onMouse(button: Int, action: Int, x: Double, y: Double)
-
     fun onMouseMove(x: Double, y: Double)
-
     fun onKey(key: Int, action: Int, x: Double, y: Double)
-    fun getKeyState(key: Int): Int
-    fun screenshot(): ByteArray
-    fun screenshot(fileName: String): File
+
+    fun getKeyState(key: Int): Int = glfwGetKey(window, key)
+
+    fun screenshot(): ByteArray = makeScreenshot(window)
+
+    fun screenshot(fileName: String): File = saveScreenshot(fileName, window)
 }
 
-abstract class GlfwApplication(protected val window: Long) : Application {
+abstract class GlfwApplication(override val window: Long) : Application {
 
     override fun init() {}
     override fun resize(width: Int, height: Int) {}
     override fun shutdown() {}
 
-    override fun stop() {
-        glfwSetWindowShouldClose(window, true)
-    }
-
     override fun onMouse(button: Int, action: Int, x: Double, y: Double) {}
     override fun onMouseMove(x: Double, y: Double) {}
     override fun onKey(key: Int, action: Int, x: Double, y: Double) {}
-
-    override fun getKeyState(key: Int): Int {
-        return glfwGetKey(window, key)
-    }
-
-    override fun screenshot(): ByteArray {
-        return makeScreenshot(window)
-    }
-
-    override fun screenshot(fileName: String): File {
-        return saveScreenshot(fileName, window)
-    }
 }
 
 data class Config(val width: Int = 640,

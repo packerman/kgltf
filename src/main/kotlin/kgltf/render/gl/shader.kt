@@ -1,6 +1,8 @@
-package kgltf.render
+package kgltf.render.gl
 
-import kgltf.render.Shader.compile
+import kgltf.render.Color
+import kgltf.render.get
+import kgltf.render.gl.Shader.compile
 import kgltf.util.buildMap
 import kgltf.util.warn
 import org.joml.Matrix4fc

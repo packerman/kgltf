@@ -1,5 +1,9 @@
-package kgltf.render
+package kgltf.render.gl
 
+import kgltf.render.Camera
+import kgltf.render.Colors
+import kgltf.render.IdentityCamera
+import kgltf.render.Transform
 import org.joml.Matrix4f
 import org.joml.Matrix4fc
 import org.lwjgl.opengl.GL11.glDrawArrays
@@ -92,9 +96,9 @@ class GL2Primitive(mode: Int,
     }
 }
 
-class GL2PrimitiveIndex(val indices: GLAccessor,
-                        mode: Int,
-                        attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+class GL2IndexedPrimitive(val indices: GLAccessor,
+                          mode: Int,
+                          attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
     private val attributeLocations = HashMap<String, Int>()
 
     override fun init(attributeLocations: Map<String, Int>) {
@@ -135,10 +139,10 @@ class GL3Primitive(val vertexArray: Int,
     }
 }
 
-class GL3PrimitiveIndex(val vertexArray: Int,
-                        val indices: GLAccessor,
-                        mode: Int,
-                        attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+class GL3IndexedPrimitive(val vertexArray: Int,
+                          val indices: GLAccessor,
+                          mode: Int,
+                          attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
 
     override fun init(attributeLocations: Map<String, Int>) {
         glBindVertexArray(vertexArray)

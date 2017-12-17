@@ -3,6 +3,7 @@ package kgltf.app
 import kgltf.app.glfw.GlfwApplication
 import kgltf.gltf.Root
 import kgltf.render.*
+import kgltf.render.gl.*
 import kgltf.util.checkGLError
 import kgltf.util.sums
 import org.joml.Matrix4f
@@ -108,7 +109,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
                 val mode = primitive.mode ?: GL_TRIANGLES
                 val attributes = primitive.attributes.mapValues { accessors[it.value] }
                 val glPrimitive = if (primitive.indices != null) {
-                    GL2PrimitiveIndex(accessors[primitive.indices], mode, attributes)
+                    GL2IndexedPrimitive(accessors[primitive.indices], mode, attributes)
                 } else {
                     GL2Primitive(mode, attributes)
                 }
@@ -129,7 +130,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
                 val mode = primitive.mode ?: GL_TRIANGLES
                 val attributes = primitive.attributes.mapValues { accessors[it.value] }
                 val glPrimitive = if (primitive.indices != null) {
-                    GL3PrimitiveIndex(vertexArrayId[primitiveIndex], accessors[primitive.indices], mode, attributes)
+                    GL3IndexedPrimitive(vertexArrayId[primitiveIndex], accessors[primitive.indices], mode, attributes)
                 } else {
                     GL3Primitive(vertexArrayId[primitiveIndex], mode, attributes)
                 }

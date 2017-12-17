@@ -1,5 +1,6 @@
 package kgltf.app.glfw
 
+import kgltf.util.firstOrDefault
 import kgltf.util.makeScreenshot
 import kgltf.util.saveScreenshot
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
@@ -17,7 +18,7 @@ import java.util.logging.Level
 import java.util.logging.LogManager
 import java.util.logging.Logger
 
-data class Size2D(val width: Int, val height: Int) {
+data class Size(val width: Int, val height: Int) {
     override fun toString(): String = "${width}x$height"
 }
 
@@ -40,9 +41,9 @@ data class GLProfile(val majorVersion: Int,
     }
 
     fun acceptedBy(profileType: Int): Boolean {
-        return when {
-            profileType == GLFW_OPENGL_ANY_PROFILE -> true
-            profileType == GLFW_OPENGL_COMPAT_PROFILE -> profile == GLFW_OPENGL_ANY_PROFILE || profile == GLFW_OPENGL_COMPAT_PROFILE
+        return when (profileType) {
+            GLFW_OPENGL_ANY_PROFILE -> true
+            GLFW_OPENGL_COMPAT_PROFILE -> profile == GLFW_OPENGL_ANY_PROFILE || profile == GLFW_OPENGL_COMPAT_PROFILE
             else -> profile == GLFW_OPENGL_CORE_PROFILE
         }
     }
@@ -69,8 +70,8 @@ interface Application {
     fun screenshot(): ByteArray
     fun screenshot(fileName: String): File
 
-    val windowSize: Size2D
-    val framebufferSize: Size2D
+    val windowSize: Size
+    val framebufferSize: Size
 }
 
 abstract class GlfwApplication(val window: Long) : Application {
@@ -84,23 +85,23 @@ abstract class GlfwApplication(val window: Long) : Application {
 
     override fun screenshot(fileName: String): File = saveScreenshot(fileName, window)
 
-    override val windowSize: Size2D
+    override val windowSize: Size
         get() {
             MemoryStack.stackPush().use { stack ->
                 val width = stack.mallocInt(1)
                 val height = stack.mallocInt(1)
                 glfwGetWindowSize(window, width, height)
-                return Size2D(width[0], height[0])
+                return Size(width[0], height[0])
             }
         }
 
-    override val framebufferSize: Size2D
+    override val framebufferSize: Size
         get() {
             MemoryStack.stackPush().use { stack ->
                 val width = stack.mallocInt(1)
                 val height = stack.mallocInt(1)
                 glfwGetFramebufferSize(window, width, height)
-                return Size2D(width[0], height[0])
+                return Size(width[0], height[0])
             }
         }
 }
@@ -112,6 +113,14 @@ data class Config(val width: Int = 640,
                   val visible: Boolean = true,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
+
+fun Config.changeProfile(newProfile: Int): Config {
+    return when (profile) {
+        GLFW_OPENGL_ANY_PROFILE -> copy(profile = newProfile)
+        newProfile -> this
+        else -> error("Cannot change the profile")
+    }
+}
 
 class Launcher(val config: Config) {
 
@@ -163,15 +172,10 @@ class Launcher(val config: Config) {
     }
 
     private fun createWindowWithBestProfile(): Long {
-        for (profile in profiles) {
-            if (profile.acceptedBy(config.profile)) {
-                val window = tryCreateWindowWithProfile(profile)
-                if (window != NULL) {
-                    return window
-                }
-            }
-        }
-        return NULL
+        return profiles.asSequence()
+                .filter { it.acceptedBy(config.profile) }
+                .map { tryCreateWindowWithProfile(it) }
+                .firstOrDefault(NULL) { it != NULL }
     }
 
     private fun tryCreateWindowWithProfile(profile: GLProfile): Long {

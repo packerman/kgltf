@@ -9,10 +9,12 @@ import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import org.lwjgl.glfw.GLFW.*
+import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 import org.lwjgl.opengl.GL30.glGenVertexArrays
+import org.lwjgl.opengl.GLCapabilities
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
@@ -36,6 +38,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     private val cameras = ArrayList<Camera>(camerasNum)
     private val cameraNodes = ArrayList<GLNode>(camerasNum)
 
+    private lateinit var capabilities: GLCapabilities
     private lateinit var renderer: Renderer
 
     private var cameraIndex = 0
@@ -44,6 +47,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     private val logger = Logger.getLogger("kgltf.viewer")
 
     override fun init() {
+        capabilities = GL.getCapabilities()
         setClearColor(Colors.BLACK)
         initBufferViews()
         initAccessors()
@@ -90,6 +94,33 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     }
 
     private fun initMeshes() {
+        if (capabilities.OpenGL33) {
+            initGL3Meshes()
+        } else {
+            initGL2Meshes()
+        }
+    }
+
+    private fun initGL2Meshes() {
+        gltf.meshes.forEachIndexed { i, mesh ->
+            val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
+            mesh.primitives.forEachIndexed { j, primitive ->
+                val mode = primitive.mode ?: GL_TRIANGLES
+                val attributes = primitive.attributes.mapValues { accessors[it.value] }
+                val glPrimitive = if (primitive.indices != null) {
+                    GL2PrimitiveIndex(accessors[primitive.indices], mode, attributes)
+                } else {
+                    GL2Primitive(mode, attributes)
+                }
+                primitives.add(glPrimitive)
+            }
+            val glMesh = GLMesh(primitives)
+            glMesh.init()
+            meshes.add(glMesh)
+        }
+    }
+
+    private fun initGL3Meshes() {
         glGenVertexArrays(vertexArrayId)
         gltf.meshes.forEachIndexed { i, mesh ->
             val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
@@ -98,9 +129,9 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
                 val mode = primitive.mode ?: GL_TRIANGLES
                 val attributes = primitive.attributes.mapValues { accessors[it.value] }
                 val glPrimitive = if (primitive.indices != null) {
-                    GLPrimitiveIndex(vertexArrayId[primitiveIndex], mode, attributes, accessors[primitive.indices])
+                    GL3PrimitiveIndex(vertexArrayId[primitiveIndex], accessors[primitive.indices], mode, attributes)
                 } else {
-                    GLPrimitive(vertexArrayId[primitiveIndex], mode, attributes)
+                    GL3Primitive(vertexArrayId[primitiveIndex], mode, attributes)
                 }
                 primitives.add(glPrimitive)
             }
@@ -203,8 +234,11 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
 
     override fun shutdown() {
         glDeleteBuffers(bufferId)
-        glDeleteVertexArrays(vertexArrayId)
+        if (capabilities.OpenGL33) {
+            glDeleteVertexArrays(vertexArrayId)
+        }
         Programs.clear()
+        checkGLError()
     }
 
     override fun onKey(key: Int, action: Int, x: Double, y: Double) {

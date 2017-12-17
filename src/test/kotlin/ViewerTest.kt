@@ -4,7 +4,7 @@ import kgltf.app.Variant
 import kgltf.app.getSampleModelUri
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
-import kgltf.app.glfw.Size2D
+import kgltf.app.glfw.Size
 import kgltf.util.ensureImageFree
 import kgltf.util.loadImageFromFile
 import kgltf.util.toArray
@@ -83,7 +83,7 @@ class ViewerTest(val testedSample: KhronosSample, val testedVariant: Variant) {
         }
     }
 
-    private fun expectedScreenshotForModel(size: Size2D, sample: KhronosSample): ByteBuffer {
+    private fun expectedScreenshotForModel(size: Size, sample: KhronosSample): ByteBuffer {
         val screenshotDirectory = directory
                 .resolve("screenshots")
                 .resolve("${size.width}x${size.height}")

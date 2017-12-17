@@ -1,8 +1,10 @@
 package kgltf.render
 
+import kgltf.render.Shader.compile
 import kgltf.util.buildMap
 import kgltf.util.warn
 import org.joml.Matrix4fc
+import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.GL_TRUE
 import org.lwjgl.opengl.GL20.*
 import java.net.URL
@@ -48,6 +50,12 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
         this.receiver()
     }
 
+    fun validate() {
+        glValidateProgram(program)
+        val status = glGetProgrami(program, GL_VALIDATE_STATUS)
+        check(status == GL_TRUE) { "Cannot validate program: ${glGetProgramInfoLog(program)}" }
+    }
+
     fun delete() {
         glDeleteProgram(program)
     }
@@ -55,7 +63,7 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
     companion object {
         fun build(name: String, attributes: Set<String>, uniforms: Set<String>): Program {
             val shaders = collectShadersForProgram(name)
-            val program = linkProgram(shaders)
+            val program = link(shaders)
             shaders.forEach(::glDeleteShader)
             val attributeMap = attributes.buildMap { glGetAttribLocation(program, it) }
             warnAboutNegativeLocations(attributeMap, name)
@@ -64,10 +72,30 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
             return Program(name, program, attributeMap, uniformMap)
         }
 
-        private fun collectShadersForProgram(name: String) = intArrayOf(
-                compileShader(GL_VERTEX_SHADER, Program::class.java.getResource("/shader/$name.vert")),
-                compileShader(GL_FRAGMENT_SHADER, Program::class.java.getResource("/shader/$name.frag"))
-        )
+        fun link(shaders: IntArray): Int {
+            val program = glCreateProgram()
+            for (shader in shaders) {
+                glAttachShader(program, shader)
+            }
+            glLinkProgram(program)
+            val status = glGetProgrami(program, GL_LINK_STATUS)
+            check(status == GL_TRUE) { "Cannot link program: ${glGetProgramInfoLog(program)}" }
+            return program
+        }
+
+        private fun collectShadersForProgram(name: String): IntArray {
+            val caps = GL.getCapabilities()
+            val directory = when {
+                caps.OpenGL33 -> "gl33"
+                else -> "gl21"
+            }
+
+            fun getResource(path: String) = requireNotNull(Program::class.java.getResource(path)) { "Cannot find resource $path" }
+            return intArrayOf(
+                    compile(GL_VERTEX_SHADER, getResource("/shader/$directory/$name.vert")),
+                    compile(GL_FRAGMENT_SHADER, getResource("/shader/$directory/$name.frag"))
+            )
+        }
 
         private fun warnAboutNegativeLocations(locations: Map<String, Int>, programName: String) {
             for ((name, location) in locations) {
@@ -77,28 +105,18 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
     }
 }
 
-fun linkProgram(shaders: IntArray): Int {
-    val program = glCreateProgram()
-    for (shader in shaders) {
-        glAttachShader(program, shader)
+object Shader {
+    fun compile(type: Int, source: String): Int {
+        val shader = glCreateShader(type)
+        glShaderSource(shader, source)
+        glCompileShader(shader)
+        val status = glGetShaderi(shader, GL_COMPILE_STATUS)
+        check(status == GL_TRUE) { "Cannot compile shader: ${glGetShaderInfoLog(shader)}" }
+        return shader
     }
-    glLinkProgram(program)
-    val status = glGetProgrami(program, GL_LINK_STATUS)
-    check(status == GL_TRUE) { "Cannot link program: ${glGetProgramInfoLog(program)}" }
-    return program
+
+    fun compile(type: Int, source: URL) = compile(type, source.readText())
 }
-
-fun compileShader(type: Int, source: String): Int {
-    val shader = glCreateShader(type)
-    glShaderSource(shader, source)
-    glCompileShader(shader)
-    val status = glGetShaderi(shader, GL_COMPILE_STATUS)
-    check(status == GL_TRUE) { "Cannot compile shader: ${glGetShaderInfoLog(shader)}" }
-    return shader
-}
-
-fun compileShader(type: Int, source: URL) = compileShader(type, source.readText())
-
 
 object AttributeName {
     const val POSITION = "position"

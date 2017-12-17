@@ -46,14 +46,81 @@ class GLAccessor(val bufferView: GLBufferView,
     }
 }
 
-open class GLPrimitive(val vertexArray: Int,
-                       val mode: Int,
-                       val attributes: Map<String, GLAccessor>) {
+abstract class GLPrimitive(val mode: Int,
+                           val attributes: Map<String, GLAccessor>) {
+
+    protected val targets: Set<Int> = attributes.values.mapTo(HashSet()) { it.bufferView.target }
+
+    abstract fun init(attributeLocations: Map<String, Int>)
+    abstract fun render()
+    abstract fun unbind()
+}
+
+class GL2Primitive(mode: Int,
+                   attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+
+    private val attributeLocations = HashMap<String, Int>()
+    private val count = attributes.values.first().count
+
+    override fun init(attributeLocations: Map<String, Int>) {
+        this.attributeLocations.putAll(attributeLocations)
+    }
+
+    override fun render() {
+        attributes.forEach { (attribute, accessor) ->
+            accessor.bufferView.bind()
+            attributeLocations[attribute]?.let { location ->
+                glEnableVertexAttribArray(location)
+                accessor.setVertexAttribPointer(location)
+            }
+        }
+        glDrawArrays(mode, 0, count)
+    }
+
+    override fun unbind() {
+        targets.forEach {
+            glBindBuffer(it, 0)
+        }
+    }
+}
+
+class GL2PrimitiveIndex(val indices: GLAccessor,
+                        mode: Int,
+                        attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+    private val attributeLocations = HashMap<String, Int>()
+
+    override fun init(attributeLocations: Map<String, Int>) {
+        this.attributeLocations.putAll(attributeLocations)
+    }
+
+    override fun render() {
+        attributes.forEach { (attribute, accessor) ->
+            accessor.bufferView.bind()
+            attributeLocations[attribute]?.let { location ->
+                glEnableVertexAttribArray(location)
+                accessor.setVertexAttribPointer(location)
+            }
+        }
+        indices.bufferView.bind()
+        glDrawElements(mode, indices.count, indices.componentType, indices.byteOffset)
+    }
+
+    override fun unbind() {
+        targets.forEach {
+            glBindBuffer(it, 0)
+        }
+        glBindBuffer(indices.bufferView.target, 0)
+    }
+}
+
+
+class GL3Primitive(val vertexArray: Int,
+                   mode: Int,
+                   attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
 
     private val count = attributes.values.first().count
-    private val targets: Set<Int> = attributes.values.mapTo(HashSet()) { it.bufferView.target }
 
-    open fun init(attributeLocations: Map<String, Int>) {
+    override fun init(attributeLocations: Map<String, Int>) {
         glBindVertexArray(vertexArray)
         attributes.forEach { (attribute, accessor) ->
             accessor.bufferView.bind()
@@ -64,16 +131,12 @@ open class GLPrimitive(val vertexArray: Int,
         }
     }
 
-    fun render() {
+    override fun render() {
         glBindVertexArray(vertexArray)
-        draw()
-    }
-
-    protected open fun draw() {
         glDrawArrays(mode, 0, count)
     }
 
-    open fun unbind() {
+    override fun unbind() {
         glBindVertexArray(0)
         targets.forEach {
             glBindBuffer(it, 0)
@@ -81,22 +144,33 @@ open class GLPrimitive(val vertexArray: Int,
     }
 }
 
-class GLPrimitiveIndex(vertexArray: Int,
-                       mode: Int,
-                       attributes: Map<String, GLAccessor>,
-                       val indices: GLAccessor) : GLPrimitive(vertexArray, mode, attributes) {
+class GL3PrimitiveIndex(val vertexArray: Int,
+                        val indices: GLAccessor,
+                        mode: Int,
+                        attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
 
     override fun init(attributeLocations: Map<String, Int>) {
-        super.init(attributeLocations)
+        glBindVertexArray(vertexArray)
+        attributes.forEach { (attribute, accessor) ->
+            accessor.bufferView.bind()
+            attributeLocations[attribute]?.let { location ->
+                glEnableVertexAttribArray(location)
+                accessor.setVertexAttribPointer(location)
+            }
+        }
         indices.bufferView.bind()
     }
 
-    override fun draw() {
+    override fun render() {
+        glBindVertexArray(vertexArray)
         glDrawElements(mode, indices.count, indices.componentType, indices.byteOffset)
     }
 
     override fun unbind() {
-        super.unbind()
+        glBindVertexArray(0)
+        targets.forEach {
+            glBindBuffer(it, 0)
+        }
         glBindBuffer(indices.bufferView.target, 0)
     }
 }
@@ -117,6 +191,7 @@ class GLMesh(val primitives: List<GLPrimitive>) {
             attributeLocations = getSemanticAttributesLocation(this)
             primitives.forEach { primitive ->
                 primitive.init(attributeLocations)
+                validate()
                 primitive.unbind()
             }
         }

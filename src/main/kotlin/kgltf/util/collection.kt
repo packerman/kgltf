@@ -16,3 +16,8 @@ fun List<Int>.sums(): List<Int> {
     list.add(s)
     return list
 }
+
+inline fun <T> Sequence<T>.firstOrDefault(defaultValue: T, predicate: (T) -> Boolean): T {
+    for (element in this) if (predicate(element)) return element
+    return defaultValue
+}

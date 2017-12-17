@@ -99,6 +99,7 @@ class ViewerTest(val testedSample: KhronosSample, val testedVariant: Variant) {
 
     private fun byteArrayDistance(first: ByteArray, second: ByteArray) =
             first.zip(second)
+                    .asSequence()
                     .map { (b1, b2) -> Math.abs(b1 - b2).toLong() }
                     .sum()
 }

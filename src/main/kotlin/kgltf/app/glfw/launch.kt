@@ -11,7 +11,6 @@ import org.lwjgl.opengl.GL20.GL_SHADING_LANGUAGE_VERSION
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
-import org.lwjgl.system.Platform
 import java.io.File
 import java.io.IOException
 import java.util.logging.Level
@@ -21,6 +20,38 @@ import java.util.logging.Logger
 data class Size2D(val width: Int, val height: Int) {
     override fun toString(): String = "${width}x$height"
 }
+
+data class GLProfile(val majorVersion: Int,
+                     val minorVersion: Int,
+                     val profile: Int,
+                     val forwardCompatible: Boolean) {
+    init {
+        require(equalOrAbove(2, 1))
+        require(equalOrAbove(3, 2) || profile == GLFW_OPENGL_ANY_PROFILE)
+        require(equalOrAbove(3, 0) || !forwardCompatible)
+    }
+
+    fun equalOrAbove(major: Int, minor: Int): Boolean {
+        return when {
+            majorVersion > major -> true
+            majorVersion == major && minorVersion >= minor -> true
+            else -> false
+        }
+    }
+
+    fun acceptedBy(profileType: Int): Boolean {
+        return when {
+            profileType == GLFW_OPENGL_ANY_PROFILE -> true
+            profileType == GLFW_OPENGL_COMPAT_PROFILE -> profile == GLFW_OPENGL_ANY_PROFILE || profile == GLFW_OPENGL_COMPAT_PROFILE
+            else -> profile == GLFW_OPENGL_CORE_PROFILE
+        }
+    }
+}
+
+val profiles = listOf(
+        GLProfile(3, 3, GLFW_OPENGL_CORE_PROFILE, true),
+        GLProfile(2, 1, GLFW_OPENGL_ANY_PROFILE, false)
+)
 
 interface Application {
     fun init()
@@ -77,6 +108,7 @@ abstract class GlfwApplication(val window: Long) : Application {
 data class Config(val width: Int = 640,
                   val height: Int = 480,
                   val title: String = "",
+                  val profile: Int = GLFW_OPENGL_ANY_PROFILE,
                   val visible: Boolean = true,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
@@ -107,19 +139,7 @@ class Launcher(val config: Config) {
     }
 
     private fun createWindow(): Long {
-        if (Platform.get() == Platform.MACOSX) {
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
-            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
-            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
-        }
-        if (config.glDebug) {
-            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
-        }
-
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-
-        val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
+        val window = createWindowWithBestProfile()
         check(window != NULL) { "Failed to create the GLFW window" }
         if (config.stickyKeys) {
             glfwSetInputMode(window, GLFW_STICKY_KEYS, 1)
@@ -140,6 +160,33 @@ class Launcher(val config: Config) {
         logger.config { "GL version: ${glGetString(GL_VERSION)}" }
         logger.config { "GLSL version: ${glGetString(GL_SHADING_LANGUAGE_VERSION)}" }
         return window
+    }
+
+    private fun createWindowWithBestProfile(): Long {
+        for (profile in profiles) {
+            if (profile.acceptedBy(config.profile)) {
+                val window = tryCreateWindowWithProfile(profile)
+                if (window != NULL) {
+                    return window
+                }
+            }
+        }
+        return NULL
+    }
+
+    private fun tryCreateWindowWithProfile(profile: GLProfile): Long {
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, profile.majorVersion)
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, profile.minorVersion)
+        if (profile.forwardCompatible) {
+            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
+        }
+        glfwWindowHint(GLFW_OPENGL_PROFILE, profile.profile)
+        if (config.glDebug) {
+            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
+        }
+
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
+        return glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
     }
 
     private class Runtime(val window: Long, val app: Application) {

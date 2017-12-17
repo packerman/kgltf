@@ -1,5 +1,8 @@
+package kgltf.app
+
+import kgltf.app.glfw.GlfwApplication
+import kgltf.gltf.Root
 import kgltf.render.*
-import kgltf.render.Camera
 import kgltf.util.checkGLError
 import kgltf.util.sums
 import org.joml.Matrix4f
@@ -10,8 +13,11 @@ import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 import org.lwjgl.opengl.GL30.glGenVertexArrays
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.logging.Logger
 
-class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
+class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplication(window) {
 
     private val bufferId = IntArray(gltf.bufferViews.size)
 
@@ -34,6 +40,8 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
 
     private var cameraIndex = 0
     private var sceneIndex = 0
+
+    private val logger = Logger.getLogger("kgltf.viewer")
 
     override fun init() {
         setClearColor(Colors.BLACK)
@@ -189,20 +197,31 @@ class GltfViewer(val gltf: Root, val data: GltfData) : Application() {
     }
 
     override fun resize(width: Int, height: Int) {
+        logger.info { "resize $width $height" }
         glViewport(0, 0, width, height)
     }
 
     override fun shutdown() {
         glDeleteBuffers(bufferId)
         glDeleteVertexArrays(vertexArrayId)
+        Programs.clear()
     }
 
     override fun onKey(key: Int, action: Int, x: Double, y: Double) {
+        fun keyPressed(keySymbol: Int) = key == keySymbol && action == GLFW_PRESS
         when {
-            key == GLFW_KEY_C && action == GLFW_PRESS -> if (cameraNodes.isNotEmpty()) {
+            keyPressed(GLFW_KEY_C) -> if (cameraNodes.isNotEmpty()) {
                 cameraIndex = (cameraIndex + 1) % cameraNodes.size
             }
-            key == GLFW_KEY_S && action == GLFW_PRESS -> sceneIndex = (sceneIndex + 1) % scenes.size
+            keyPressed(GLFW_KEY_S) -> sceneIndex = (sceneIndex + 1) % scenes.size
+            keyPressed(GLFW_KEY_P) -> {
+                val current = LocalDateTime.now()
+                val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")
+                val formatted = current.format(formatter)
+                val fileName = "screenshot_$formatted.png"
+                val savedFile = screenshot(fileName)
+                logger.info("Saved screenshot to ${savedFile}")
+            }
         }
     }
 

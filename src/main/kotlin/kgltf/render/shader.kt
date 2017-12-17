@@ -8,17 +8,32 @@ import org.lwjgl.opengl.GL20.*
 import java.net.URL
 
 object Programs {
-    val flat: Program by lazy {
-        Program.build("flat",
-                attributes = setOf(AttributeName.POSITION),
-                uniforms = setOf(UniformName.MODEL_VIEW_PROJECTION_MATRIX, UniformName.COLOR)
-        )
+
+    private val suppliers = mapOf(
+            "flat" to {
+                Program.build("flat",
+                        attributes = setOf(AttributeName.POSITION),
+                        uniforms = setOf(UniformName.MODEL_VIEW_PROJECTION_MATRIX, UniformName.COLOR)
+                )
+            },
+            "normal" to {
+                Program.build("normal",
+                        attributes = setOf(AttributeName.POSITION, AttributeName.NORMAL),
+                        uniforms = setOf(UniformName.MODEL_VIEW_PROJECTION_MATRIX, UniformName.NORMAL_MATRIX)
+                )
+            })
+
+    private val programs = HashMap<String, Program>()
+
+
+    operator fun get(name: String): Program = programs.computeIfAbsent(name) {
+        val supplier = requireNotNull(suppliers[it]) { "Program $name doesn't exist" }
+        supplier()
     }
-    val normal: Program by lazy {
-        Program.build("normal",
-                attributes = setOf(AttributeName.POSITION, AttributeName.NORMAL),
-                uniforms = setOf(UniformName.MODEL_VIEW_PROJECTION_MATRIX, UniformName.NORMAL_MATRIX)
-        )
+
+    fun clear() {
+        programs.values.forEach(Program::delete)
+        programs.clear()
     }
 }
 
@@ -31,6 +46,10 @@ class Program(val name: String, val program: Int, val attributes: Map<String, In
     inline fun use(receiver: Program.() -> Unit) {
         this.use()
         this.receiver()
+    }
+
+    fun delete() {
+        glDeleteProgram(program)
     }
 
     companion object {

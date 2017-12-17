@@ -53,11 +53,10 @@ class ViewerTest(val testedSample: KhronosSample, val testedVariant: Variant) {
 
         @Parameters(name = "{index}: testModelAndVariant({0}, {1})")
         @JvmStatic
-        fun data(): Array<Array<Any>> {
-            return KhronosSample.values()
-                    .flatMap { sample -> sample.variants.map { variant -> arrayOf<Any>(sample, variant) } }
-                    .toTypedArray()
-        }
+        fun data(): Array<Array<Any>> =
+                KhronosSample.values()
+                        .flatMap { sample -> sample.variants.map { variant -> arrayOf<Any>(sample, variant) } }
+                        .toTypedArray()
     }
 
     @Before
@@ -99,5 +98,7 @@ class ViewerTest(val testedSample: KhronosSample, val testedVariant: Variant) {
     }
 
     private fun byteArrayDistance(first: ByteArray, second: ByteArray) =
-            first.zip(second).map { (b1, b2) -> Math.abs(b1 - b2).toLong() }.sum()
+            first.zip(second)
+                    .map { (b1, b2) -> Math.abs(b1 - b2).toLong() }
+                    .sum()
 }

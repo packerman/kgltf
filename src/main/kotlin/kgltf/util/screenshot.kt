@@ -26,9 +26,7 @@ fun makeScreenshot(window: Long, format: Int = GL_RGBA): ByteArray {
         val height = stack.mallocInt(1)
         glfwGetFramebufferSize(window, width, height)
         makeScreenshot(width[0], height[0], format).ensureMemoryFree { buffer ->
-            val byteArray = ByteArray(buffer.capacity())
-            buffer.get(byteArray)
-            return byteArray
+            return buffer.toArray()
         }
     }
 }
@@ -73,11 +71,3 @@ private val bytesPerPixel = mapOf(
         GL_RGB to 3,
         GL_RGBA to 4
 )
-
-private inline fun <R> ByteBuffer.ensureMemoryFree(block: (ByteBuffer) -> R): R {
-    try {
-        return block(this)
-    } finally {
-        MemoryUtil.memFree(this)
-    }
-}

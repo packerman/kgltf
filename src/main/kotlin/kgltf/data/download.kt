@@ -55,7 +55,7 @@ class Cache : Closeable {
             } else {
                 logger.info { "Download $uri" }
                 val data = read(uri.toURL())
-                val newFile = File.createTempFile("cached", "", directory)
+                val newFile = File.createTempFile("cache", "", directory)
                 write(newFile, data)
                 entries[uri] = FileEntry(newFile, Date())
                 data

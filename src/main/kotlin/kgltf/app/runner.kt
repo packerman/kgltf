@@ -1,11 +1,10 @@
 package kgltf.app
 
 import kgltf.app.glfw.Application
-import kgltf.data.Cache
-import kgltf.data.DataUri
-import kgltf.app.glfw.GlfwApplication
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Launcher
+import kgltf.data.Cache
+import kgltf.data.DataUri
 import kgltf.gltf.Root
 import java.net.URI
 import java.util.concurrent.Callable

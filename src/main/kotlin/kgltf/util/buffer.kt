@@ -1,7 +1,9 @@
 package kgltf.util
 
 import org.joml.*
+import org.lwjgl.system.MemoryUtil
 import java.nio.Buffer
+import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 
 fun FloatBuffer.toFloatIterable(): Iterable<Float> {
@@ -53,5 +55,21 @@ inline fun <T : Buffer, R> T.use(block: (T) -> R): R {
         return block(this)
     } finally {
         reset()
+    }
+}
+
+fun ByteBuffer.toArray(): ByteArray {
+    val array = ByteArray(remaining())
+    use {
+        get(array)
+        return array
+    }
+}
+
+inline fun <R> ByteBuffer.ensureMemoryFree(block: (ByteBuffer) -> R): R {
+    try {
+        return block(this)
+    } finally {
+        MemoryUtil.memFree(this)
     }
 }

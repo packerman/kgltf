@@ -8,6 +8,7 @@ import org.lwjgl.glfw.GLFWErrorCallback
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL20.GL_SHADING_LANGUAGE_VERSION
+import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
@@ -17,39 +18,60 @@ import java.util.logging.Level
 import java.util.logging.LogManager
 import java.util.logging.Logger
 
-interface Application {
-    val window: Long
+data class Size2D(val width: Int, val height: Int) {
+    override fun toString(): String = "${width}x$height"
+}
 
+interface Application {
     fun init()
     fun render()
     fun resize(width: Int, height: Int)
-
     fun shutdown()
 
-    fun stop() {
+    fun stop()
+
+    fun onMouse(button: Int, action: Int, x: Double, y: Double) {}
+    fun onMouseMove(x: Double, y: Double) {}
+    fun onKey(key: Int, action: Int, x: Double, y: Double) {}
+    fun getKeyState(key: Int): Int
+
+    fun screenshot(): ByteArray
+    fun screenshot(fileName: String): File
+
+    val windowSize: Size2D
+    val framebufferSize: Size2D
+}
+
+abstract class GlfwApplication(val window: Long) : Application {
+    override fun stop() {
         glfwSetWindowShouldClose(window, true)
     }
 
-    fun onMouse(button: Int, action: Int, x: Double, y: Double)
-    fun onMouseMove(x: Double, y: Double)
-    fun onKey(key: Int, action: Int, x: Double, y: Double)
+    override fun getKeyState(key: Int): Int = glfwGetKey(window, key)
 
-    fun getKeyState(key: Int): Int = glfwGetKey(window, key)
+    override fun screenshot(): ByteArray = makeScreenshot(window)
 
-    fun screenshot(): ByteArray = makeScreenshot(window)
+    override fun screenshot(fileName: String): File = saveScreenshot(fileName, window)
 
-    fun screenshot(fileName: String): File = saveScreenshot(fileName, window)
-}
+    override val windowSize: Size2D
+        get() {
+            MemoryStack.stackPush().use { stack ->
+                val width = stack.mallocInt(1)
+                val height = stack.mallocInt(1)
+                glfwGetWindowSize(window, width, height)
+                return Size2D(width[0], height[0])
+            }
+        }
 
-abstract class GlfwApplication(override val window: Long) : Application {
-
-    override fun init() {}
-    override fun resize(width: Int, height: Int) {}
-    override fun shutdown() {}
-
-    override fun onMouse(button: Int, action: Int, x: Double, y: Double) {}
-    override fun onMouseMove(x: Double, y: Double) {}
-    override fun onKey(key: Int, action: Int, x: Double, y: Double) {}
+    override val framebufferSize: Size2D
+        get() {
+            MemoryStack.stackPush().use { stack ->
+                val width = stack.mallocInt(1)
+                val height = stack.mallocInt(1)
+                glfwGetFramebufferSize(window, width, height)
+                return Size2D(width[0], height[0])
+            }
+        }
 }
 
 data class Config(val width: Int = 640,

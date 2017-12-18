@@ -4,6 +4,7 @@ import kgltf.render.Camera
 import kgltf.render.Colors
 import kgltf.render.IdentityCamera
 import kgltf.render.Transform
+import kgltf.util.Disposable
 import org.joml.Matrix4f
 import org.joml.Matrix4fc
 import org.lwjgl.opengl.GL11.glDrawArrays
@@ -12,6 +13,7 @@ import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.glBindVertexArray
+import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 
 class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 
@@ -171,9 +173,9 @@ class GLMesh(val primitives: List<GLPrimitive>) {
     private val modelViewProjectionMatrix = Matrix4f()
     private val modelViewMatrix = Matrix4f()
 
-    fun init() {
+    fun init(programBuilder: ProgramBuilder) {
         val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
-        program = if (hasNormals) Programs["normal"] else Programs["flat"]
+        program = if (hasNormals) programBuilder["normal"] else programBuilder["flat"]
         program.use {
             attributeLocations = getSemanticAttributesLocation(this)
             primitives.forEach { primitive ->
@@ -253,7 +255,27 @@ class CameraTransform {
     }
 }
 
-class Renderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>) {
+class GL2Disposable(val bufferId: IntArray, val programs: ProgramBuilder) : Disposable {
+    override fun dispose() {
+        glDeleteBuffers(bufferId)
+        programs.dispose()
+    }
+}
+
+class GL3Disposable(val vertexArrayId: IntArray, bufferId: IntArray, programs: ProgramBuilder) : Disposable {
+
+    private val gl2Disposer = GL2Disposable(bufferId, programs)
+
+    override fun dispose() {
+        gl2Disposer.dispose()
+        glDeleteVertexArrays(vertexArrayId)
+    }
+}
+
+class GLRenderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val disposable: Disposable) : Disposable {
+
+    val scenesCount: Int = scenes.size
+    val camerasCount: Int = cameraNodes.size
 
     private val cameraTransforms = CameraTransform()
 
@@ -271,5 +293,9 @@ class Renderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>) {
         val camera = requireNotNull(cameraNode.camera)
         cameraTransforms.set(camera, cameraNode.transform)
         scene.render(cameraTransforms)
+    }
+
+    override fun dispose() {
+        disposable.dispose()
     }
 }

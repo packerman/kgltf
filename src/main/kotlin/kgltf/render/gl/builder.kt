@@ -13,23 +13,26 @@ import org.joml.Vector3f
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL30.glGenVertexArrays
+import org.lwjgl.opengl.GLCapabilities
 
 abstract class GLRendererBuilder(root: Root, data: GltfData) : Visitor(root, data) {
 
-    private val bufferId = IntArray(root.bufferViews.size)
+    abstract val programBuilder: ProgramBuilder
+
+    protected val bufferId = IntArray(root.bufferViews.size)
 
     private val bufferViews = ArrayList<GLBufferView>(root.bufferViews.size)
     private val accessors = ArrayList<GLAccessor>(root.accessors.size)
     private val meshes = ArrayList<GLMesh>(root.meshes.size)
     private val nodes = ArrayList<GLNode>(root.nodes.size)
-    private val scenes = ArrayList<GLScene>(root.scenes.size)
+    protected val scenes = ArrayList<GLScene>(root.scenes.size)
 
     protected val primitivesNum = root.meshes.map { it.primitives.size }.sum()
     private val startPrimitiveIndex = root.meshes.map { it.primitives.size }.sums()
 
     private val camerasNum = root.cameras?.size ?: 0
     private val cameras = ArrayList<Camera>(camerasNum)
-    private val cameraNodes = ArrayList<GLNode>(camerasNum)
+    protected val cameraNodes = ArrayList<GLNode>(camerasNum)
 
     open fun init() {
         glGenBuffers(bufferId)
@@ -71,14 +74,14 @@ abstract class GLRendererBuilder(root: Root, data: GltfData) : Visitor(root, dat
             primitives.add(glPrimitive)
         }
         val glMesh = GLMesh(primitives)
-        glMesh.init()
+        glMesh.init(programBuilder)
         meshes.add(glMesh)
     }
 
     abstract fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<String, GLAccessor>): GLPrimitive
     abstract fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>): GLPrimitive
 
-    override fun visitCamera(camera: kgltf.gltf.Camera) {
+    final override fun visitCamera(camera: kgltf.gltf.Camera) {
         cameras.add(
                 when {
                     camera.perspective != null -> {
@@ -100,7 +103,7 @@ abstract class GLRendererBuilder(root: Root, data: GltfData) : Visitor(root, dat
         )
     }
 
-    override fun visitNode(node: Node) {
+    final override fun visitNode(node: Node) {
         val transform = Transform()
         if (node.matrix != null) {
             transform.matrix = Matrix4f(
@@ -128,21 +131,45 @@ abstract class GLRendererBuilder(root: Root, data: GltfData) : Visitor(root, dat
         }
     }
 
-    override fun visitScene(scene: Scene) {
+    final override fun visitScene(scene: Scene) {
         scenes.add(GLScene(scene.nodes.map { nodes[it] }))
+    }
+
+    abstract fun build(): GLRenderer
+
+    companion object {
+        fun createRenderer(capabilities: GLCapabilities, gltf: Root, data: GltfData): GLRenderer {
+            val builder = when {
+                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, data)
+                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, data)
+                else -> error("Cannot create renderer for the current GL capabilities")
+            }
+            builder.init()
+            builder.visit()
+            return builder.build()
+        }
     }
 }
 
 class GL2RendererBuilder(root: Root, data: GltfData) : GLRendererBuilder(root, data) {
+
+    override val programBuilder = ProgramBuilder("/shader/gl21")
+
     override fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<String, GLAccessor>) =
             GL2IndexedPrimitive(indices, mode, attributes)
 
     override fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>) =
             GL2Primitive(mode, attributes)
+
+    override fun build(): GLRenderer {
+        return GLRenderer(scenes, cameraNodes,
+                GL2Disposable(bufferId, programBuilder))
+    }
 }
 
 class GL3RendererBuilder(root: Root, data: GltfData) : GLRendererBuilder(root, data) {
 
+    override val programBuilder: ProgramBuilder = ProgramBuilder("/shader/gl33")
     private val vertexArrayId = IntArray(primitivesNum)
 
     override fun init() {
@@ -155,4 +182,9 @@ class GL3RendererBuilder(root: Root, data: GltfData) : GLRendererBuilder(root, d
 
     override fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>) =
             GL3Primitive(vertexArrayId[primitiveIndex], mode, attributes)
+
+    override fun build(): GLRenderer {
+        return GLRenderer(scenes, cameraNodes,
+                GL3Disposable(vertexArrayId, bufferId, programBuilder))
+    }
 }

@@ -1,5 +1,10 @@
-package kgltf.render
+package kgltf.render.gl
 
+import kgltf.render.Camera
+import kgltf.render.Colors
+import kgltf.render.IdentityCamera
+import kgltf.render.Transform
+import kgltf.util.Disposable
 import org.joml.Matrix4f
 import org.joml.Matrix4fc
 import org.lwjgl.opengl.GL11.glDrawArrays
@@ -8,6 +13,7 @@ import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.glBindVertexArray
+import org.lwjgl.opengl.GL30.glDeleteVertexArrays
 
 class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 
@@ -46,15 +52,16 @@ class GLAccessor(val bufferView: GLBufferView,
     }
 }
 
-open class GLPrimitive(val vertexArray: Int,
-                       val mode: Int,
-                       val attributes: Map<String, GLAccessor>) {
+abstract class GLPrimitive(val mode: Int,
+                           val attributes: Map<String, GLAccessor>) {
 
-    private val count = attributes.values.first().count
-    private val targets: Set<Int> = attributes.values.mapTo(HashSet()) { it.bufferView.target }
+    protected val targets: Set<Int> = attributes.values.mapTo(HashSet()) { it.bufferView.target }
 
-    open fun init(attributeLocations: Map<String, Int>) {
-        glBindVertexArray(vertexArray)
+    abstract fun init(attributeLocations: Map<String, Int>)
+    abstract fun render()
+    abstract fun unbind()
+
+    protected fun initAttributes(attributeLocations: Map<String, Int>) {
         attributes.forEach { (attribute, accessor) ->
             accessor.bufferView.bind()
             attributeLocations[attribute]?.let { location ->
@@ -64,39 +71,95 @@ open class GLPrimitive(val vertexArray: Int,
         }
     }
 
-    fun render() {
-        glBindVertexArray(vertexArray)
-        draw()
-    }
-
-    protected open fun draw() {
-        glDrawArrays(mode, 0, count)
-    }
-
-    open fun unbind() {
-        glBindVertexArray(0)
+    protected fun unbindBufferTargets() {
         targets.forEach {
             glBindBuffer(it, 0)
         }
     }
 }
 
-class GLPrimitiveIndex(vertexArray: Int,
-                       mode: Int,
-                       attributes: Map<String, GLAccessor>,
-                       val indices: GLAccessor) : GLPrimitive(vertexArray, mode, attributes) {
+class GL2Primitive(mode: Int,
+                   attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+
+    private val attributeLocations = HashMap<String, Int>()
+    private val count = attributes.values.first().count
 
     override fun init(attributeLocations: Map<String, Int>) {
-        super.init(attributeLocations)
-        indices.bufferView.bind()
+        this.attributeLocations.putAll(attributeLocations)
     }
 
-    override fun draw() {
+    override fun render() {
+        initAttributes(attributeLocations)
+        glDrawArrays(mode, 0, count)
+    }
+
+    override fun unbind() {
+        unbindBufferTargets()
+    }
+}
+
+class GL2IndexedPrimitive(val indices: GLAccessor,
+                          mode: Int,
+                          attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+    private val attributeLocations = HashMap<String, Int>()
+
+    override fun init(attributeLocations: Map<String, Int>) {
+        this.attributeLocations.putAll(attributeLocations)
+    }
+
+    override fun render() {
+        initAttributes(attributeLocations)
+        indices.bufferView.bind()
         glDrawElements(mode, indices.count, indices.componentType, indices.byteOffset)
     }
 
     override fun unbind() {
-        super.unbind()
+        unbindBufferTargets()
+        glBindBuffer(indices.bufferView.target, 0)
+    }
+}
+
+class GL3Primitive(val vertexArray: Int,
+                   mode: Int,
+                   attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+
+    private val count = attributes.values.first().count
+
+    override fun init(attributeLocations: Map<String, Int>) {
+        glBindVertexArray(vertexArray)
+        initAttributes(attributeLocations)
+    }
+
+    override fun render() {
+        glBindVertexArray(vertexArray)
+        glDrawArrays(mode, 0, count)
+    }
+
+    override fun unbind() {
+        glBindVertexArray(0)
+        unbindBufferTargets()
+    }
+}
+
+class GL3IndexedPrimitive(val vertexArray: Int,
+                          val indices: GLAccessor,
+                          mode: Int,
+                          attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+
+    override fun init(attributeLocations: Map<String, Int>) {
+        glBindVertexArray(vertexArray)
+        initAttributes(attributeLocations)
+        indices.bufferView.bind()
+    }
+
+    override fun render() {
+        glBindVertexArray(vertexArray)
+        glDrawElements(mode, indices.count, indices.componentType, indices.byteOffset)
+    }
+
+    override fun unbind() {
+        glBindVertexArray(0)
+        unbindBufferTargets()
         glBindBuffer(indices.bufferView.target, 0)
     }
 }
@@ -110,13 +173,14 @@ class GLMesh(val primitives: List<GLPrimitive>) {
     private val modelViewProjectionMatrix = Matrix4f()
     private val modelViewMatrix = Matrix4f()
 
-    fun init() {
+    fun init(programBuilder: ProgramBuilder) {
         val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
-        program = if (hasNormals) Programs["normal"] else Programs["flat"]
+        program = if (hasNormals) programBuilder["normal"] else programBuilder["flat"]
         program.use {
             attributeLocations = getSemanticAttributesLocation(this)
             primitives.forEach { primitive ->
                 primitive.init(attributeLocations)
+                validate()
                 primitive.unbind()
             }
         }
@@ -191,7 +255,27 @@ class CameraTransform {
     }
 }
 
-class Renderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>) {
+class GL2Disposable(val bufferId: IntArray, val programs: ProgramBuilder) : Disposable {
+    override fun dispose() {
+        glDeleteBuffers(bufferId)
+        programs.dispose()
+    }
+}
+
+class GL3Disposable(val vertexArrayId: IntArray, bufferId: IntArray, programs: ProgramBuilder) : Disposable {
+
+    private val gl2Disposer = GL2Disposable(bufferId, programs)
+
+    override fun dispose() {
+        gl2Disposer.dispose()
+        glDeleteVertexArrays(vertexArrayId)
+    }
+}
+
+class GLRenderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val disposable: Disposable) : Disposable {
+
+    val scenesCount: Int = scenes.size
+    val camerasCount: Int = cameraNodes.size
 
     private val cameraTransforms = CameraTransform()
 
@@ -209,5 +293,9 @@ class Renderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>) {
         val camera = requireNotNull(cameraNode.camera)
         cameraTransforms.set(camera, cameraNode.transform)
         scene.render(cameraTransforms)
+    }
+
+    override fun dispose() {
+        disposable.dispose()
     }
 }

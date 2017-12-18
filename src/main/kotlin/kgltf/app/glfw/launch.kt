@@ -1,5 +1,6 @@
 package kgltf.app.glfw
 
+import kgltf.util.firstOrDefault
 import kgltf.util.makeScreenshot
 import kgltf.util.saveScreenshot
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
@@ -11,16 +12,47 @@ import org.lwjgl.opengl.GL20.GL_SHADING_LANGUAGE_VERSION
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
-import org.lwjgl.system.Platform
 import java.io.File
 import java.io.IOException
 import java.util.logging.Level
 import java.util.logging.LogManager
 import java.util.logging.Logger
 
-data class Size2D(val width: Int, val height: Int) {
+data class Size(val width: Int, val height: Int) {
     override fun toString(): String = "${width}x$height"
 }
+
+data class GLProfile(val majorVersion: Int,
+                     val minorVersion: Int,
+                     val profile: Int,
+                     val forwardCompatible: Boolean) {
+    init {
+        require(equalOrAbove(2, 1))
+        require(equalOrAbove(3, 2) || profile == GLFW_OPENGL_ANY_PROFILE)
+        require(equalOrAbove(3, 0) || !forwardCompatible)
+    }
+
+    fun equalOrAbove(major: Int, minor: Int): Boolean {
+        return when {
+            majorVersion > major -> true
+            majorVersion == major && minorVersion >= minor -> true
+            else -> false
+        }
+    }
+
+    fun acceptedBy(profileType: Int): Boolean {
+        return when (profileType) {
+            GLFW_OPENGL_ANY_PROFILE -> true
+            GLFW_OPENGL_COMPAT_PROFILE -> profile == GLFW_OPENGL_ANY_PROFILE || profile == GLFW_OPENGL_COMPAT_PROFILE
+            else -> profile == GLFW_OPENGL_CORE_PROFILE
+        }
+    }
+}
+
+val profiles = listOf(
+        GLProfile(3, 3, GLFW_OPENGL_CORE_PROFILE, true),
+        GLProfile(2, 1, GLFW_OPENGL_ANY_PROFILE, false)
+)
 
 interface Application {
     fun init()
@@ -38,8 +70,8 @@ interface Application {
     fun screenshot(): ByteArray
     fun screenshot(fileName: String): File
 
-    val windowSize: Size2D
-    val framebufferSize: Size2D
+    val windowSize: Size
+    val framebufferSize: Size
 }
 
 abstract class GlfwApplication(val window: Long) : Application {
@@ -53,23 +85,23 @@ abstract class GlfwApplication(val window: Long) : Application {
 
     override fun screenshot(fileName: String): File = saveScreenshot(fileName, window)
 
-    override val windowSize: Size2D
+    override val windowSize: Size
         get() {
             MemoryStack.stackPush().use { stack ->
                 val width = stack.mallocInt(1)
                 val height = stack.mallocInt(1)
                 glfwGetWindowSize(window, width, height)
-                return Size2D(width[0], height[0])
+                return Size(width[0], height[0])
             }
         }
 
-    override val framebufferSize: Size2D
+    override val framebufferSize: Size
         get() {
             MemoryStack.stackPush().use { stack ->
                 val width = stack.mallocInt(1)
                 val height = stack.mallocInt(1)
                 glfwGetFramebufferSize(window, width, height)
-                return Size2D(width[0], height[0])
+                return Size(width[0], height[0])
             }
         }
 }
@@ -77,9 +109,18 @@ abstract class GlfwApplication(val window: Long) : Application {
 data class Config(val width: Int = 640,
                   val height: Int = 480,
                   val title: String = "",
+                  val profile: Int = GLFW_OPENGL_ANY_PROFILE,
                   val visible: Boolean = true,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
+
+fun Config.changeProfile(newProfile: Int): Config {
+    return when (profile) {
+        GLFW_OPENGL_ANY_PROFILE -> copy(profile = newProfile)
+        newProfile -> this
+        else -> error("Cannot change the profile")
+    }
+}
 
 class Launcher(val config: Config) {
 
@@ -107,19 +148,7 @@ class Launcher(val config: Config) {
     }
 
     private fun createWindow(): Long {
-        if (Platform.get() == Platform.MACOSX) {
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
-            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
-            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
-        }
-        if (config.glDebug) {
-            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
-        }
-
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-
-        val window = glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
+        val window = createWindowWithBestProfile()
         check(window != NULL) { "Failed to create the GLFW window" }
         if (config.stickyKeys) {
             glfwSetInputMode(window, GLFW_STICKY_KEYS, 1)
@@ -140,6 +169,28 @@ class Launcher(val config: Config) {
         logger.config { "GL version: ${glGetString(GL_VERSION)}" }
         logger.config { "GLSL version: ${glGetString(GL_SHADING_LANGUAGE_VERSION)}" }
         return window
+    }
+
+    private fun createWindowWithBestProfile(): Long {
+        return profiles.asSequence()
+                .filter { it.acceptedBy(config.profile) }
+                .map { tryCreateWindowWithProfile(it) }
+                .firstOrDefault(NULL) { it != NULL }
+    }
+
+    private fun tryCreateWindowWithProfile(profile: GLProfile): Long {
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, profile.majorVersion)
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, profile.minorVersion)
+        if (profile.forwardCompatible) {
+            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
+        }
+        glfwWindowHint(GLFW_OPENGL_PROFILE, profile.profile)
+        if (config.glDebug) {
+            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
+        }
+
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
+        return glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
     }
 
     private class Runtime(val window: Long, val app: Application) {

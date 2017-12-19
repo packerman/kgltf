@@ -6,6 +6,7 @@ import kgltf.app.glfw.Launcher
 import kgltf.data.Cache
 import kgltf.data.DataUri
 import kgltf.gltf.Root
+import java.io.File
 import java.net.URI
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -13,12 +14,14 @@ import java.util.concurrent.Future
 
 class ApplicationRunner(val config: Config) {
 
+    private val downloadDirectory = File("downloaded_files")
+
     fun runFor(uri: URI) {
         runByDelegate(uri) { it }
     }
 
     fun runByDelegate(uri: URI, delegateCreator: (Application) -> Application) {
-        Cache().use { cache ->
+        Cache(downloadDirectory).use { cache ->
             val gltf = Root.load(cache.strings.get(uri))
             val data = downloadGltfData(uri, gltf, cache)
             cache.flush()

@@ -2,24 +2,23 @@ package kgltf.data
 
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import kgltf.util.splitExt
 import java.io.Closeable
 import java.io.File
 import java.net.URI
 import java.net.URL
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
 
-class Cache : Closeable {
+class Cache(val cacheDirectory: File) : Closeable {
 
     private val entries = ConcurrentHashMap<URI, FileEntry>()
 
-    private val directory = Paths.get(System.getProperty("user.home"), ".cache", "kgltf").toFile()
-    private val entriesFile = File(directory, ".entries.txt")
+    private val entriesFile = File(cacheDirectory, ".files.json")
 
     init {
-        directory.mkdirs()
+        cacheDirectory.mkdirs()
         if (entriesFile.exists()) {
             val savedEntries = loadEntries(entriesFile)
             entries.putAll(savedEntries)
@@ -55,7 +54,8 @@ class Cache : Closeable {
             } else {
                 logger.info { "Download $uri" }
                 val data = read(uri.toURL())
-                val newFile = File.createTempFile("cache", "", directory)
+                val (prefix, suffix) = File(uri.path).splitExt()
+                val newFile = File.createTempFile(prefix + "_", suffix, cacheDirectory)
                 write(newFile, data)
                 entries[uri] = FileEntry(newFile, Date())
                 data

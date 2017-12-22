@@ -24,6 +24,7 @@ class GltfViewer(window: Long, val gltf: JsonObject, val data: GltfData) : GlfwA
     private val logger = Logger.getLogger("kgltf.viewer")
 
     override fun init() {
+        logger.info("Init application")
         setClearColor(Colors.BLACK)
 
         val capabilities = GL.getCapabilities()

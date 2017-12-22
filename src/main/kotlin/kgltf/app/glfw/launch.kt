@@ -13,9 +13,6 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import java.io.File
-import java.io.IOException
-import java.util.logging.Level
-import java.util.logging.LogManager
 import java.util.logging.Logger
 
 data class Size(val width: Int, val height: Int) {
@@ -125,8 +122,6 @@ fun Config.changeProfile(newProfile: Int): Config {
 class Launcher(val config: Config) {
 
     fun run(createApplication: (Long) -> Application) {
-        LoggingConfiguration.setUp()
-
         GLFWErrorCallback.createPrint(System.err).set()
 
         if (!glfwInit()) {
@@ -249,19 +244,5 @@ class Launcher(val config: Config) {
     }
 }
 
-object LoggingConfiguration {
+private val logger = Logger.getLogger("kgltf.app")
 
-    fun setUp() {
-        javaClass.getResourceAsStream(filePath).use { inputStream ->
-            try {
-                LogManager.getLogManager().readConfiguration(inputStream)
-            } catch (e: IOException) {
-                Logger.getGlobal().log(Level.SEVERE, e) { "Cannot read logging configuration from file: ${filePath}" }
-            }
-        }
-    }
-
-    private val filePath = "/logging.properties"
-}
-
-private val logger = Logger.getLogger("kgltf.launcher")

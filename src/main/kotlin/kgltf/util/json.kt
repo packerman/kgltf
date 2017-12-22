@@ -27,12 +27,3 @@ fun JsonObject.getAsInt(key: String): Int = getAsJsonPrimitive(key).asInt
 fun JsonObject.getAsString(key: String): String = getAsJsonPrimitive(key).asString
 
 fun JsonElement.count(member: String): Int = this.asJsonObject.count(member)
-
-
-//fun JsonElement.asArrayOfObjects(): List<JsonObject> = asJsonArray.map { it.asJsonObject }
-//
-//fun JsonObject.getAsArrayOfObjects(key: String): List<JsonObject> = get(key).asArrayOfObjects()
-//
-//fun JsonObject.getAsString(key: String): String = getAsJsonPrimitive(key).asString
-//
-//fun JsonObject.getAsInt(key: String): Int = getAsJsonPrimitive(key).asInt

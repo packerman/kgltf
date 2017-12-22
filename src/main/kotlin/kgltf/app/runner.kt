@@ -1,11 +1,15 @@
 package kgltf.app
 
+import com.google.gson.JsonObject
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Launcher
 import kgltf.data.Cache
 import kgltf.data.DataUri
-import kgltf.gltf.Root
+import kgltf.gltf.Buffer
+import kgltf.util.fromJson
+import kgltf.util.map
+import kgltf.util.parseJsonObject
 import java.io.File
 import java.net.URI
 import java.util.concurrent.Callable
@@ -22,21 +26,22 @@ class ApplicationRunner(val config: Config) {
 
     fun runByDelegate(uri: URI, delegateCreator: (Application) -> Application) {
         Cache(downloadDirectory).use { cache ->
-            val gltf = Root.load(cache.strings.get(uri))
-            val data = downloadGltfData(uri, gltf, cache)
+            val jsonTree = parseJsonObject(cache.strings.get(uri))
+            val data = downloadGltfData(uri, jsonTree, cache)
             cache.flush()
 
             Launcher(config).run { window: Long ->
-                delegateCreator(GltfViewer(window, gltf, data))
+                delegateCreator(GltfViewer(window, jsonTree, data))
             }
         }
     }
 
-    private fun downloadGltfData(uri: URI, root: Root, cache: Cache): GltfData {
+    private fun downloadGltfData(uri: URI, root: JsonObject, cache: Cache): GltfData {
         val executor = Executors.newFixedThreadPool(2)
         try {
-            val bufferFutures: List<Future<ByteArray>> = root.buffers.map { buffer ->
+            val bufferFutures: List<Future<ByteArray>> = root.map("buffers") { element ->
                 executor.submit(Callable<ByteArray> {
+                    val buffer: Buffer = fromJson(element)
                     val bufferUri = uri.resolve(buffer.uri)
                     val data = when (bufferUri.scheme) {
                         "http" -> cache.bytes.get(bufferUri)

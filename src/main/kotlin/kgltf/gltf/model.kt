@@ -3,7 +3,7 @@ package kgltf.gltf
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
-data class Root(val scenes: List<Scene>,
+data class Gltf(val scenes: List<Scene>,
                 val nodes: List<Node>,
                 val meshes: List<Mesh>,
                 val cameras: List<Camera>?,
@@ -14,9 +14,9 @@ data class Root(val scenes: List<Scene>,
 
     companion object {
         private val gson = Gson()
-        private val type = object : TypeToken<Root>() {}.type
+        private val type = object : TypeToken<Gltf>() {}.type
 
-        fun load(json: String): Root = gson.fromJson(json, type)
+        fun load(json: String): Gltf = gson.fromJson(json, type)
     }
 }
 

@@ -1,14 +1,12 @@
 package kgltf.render.gl
 
-import com.google.gson.JsonObject
+import com.google.gson.JsonElement
 import kgltf.app.GltfData
 import kgltf.gltf.*
 import kgltf.render.Camera
 import kgltf.render.OrthographicCamera
 import kgltf.render.PerspectiveCamera
 import kgltf.render.Transform
-import kgltf.util.count
-import kgltf.util.map
 import kgltf.util.sums
 import org.joml.Matrix4f
 import org.joml.Quaternionf
@@ -20,22 +18,22 @@ import org.lwjgl.opengl.GLCapabilities
 import java.util.logging.Logger
 import kgltf.gltf.Camera as GltfCamera
 
-abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(root, data) {
+abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData) : Visitor(gltf, json, data) {
 
     abstract val programBuilder: ProgramBuilder
 
-    protected val bufferId = IntArray(root.count("bufferViews"))
+    protected val bufferId = IntArray(gltf.bufferViews.size)
 
-    private val bufferViews = ArrayList<GLBufferView>(root.count("bufferViews"))
-    private val accessors = ArrayList<GLAccessor>(root.count("accessors"))
-    private val meshes = ArrayList<GLMesh>(root.count("meshes"))
-    private val nodes = ArrayList<GLNode>(root.count("nodes"))
-    protected val scenes = ArrayList<GLScene>(root.count("scenes"))
+    private val bufferViews = ArrayList<GLBufferView>(gltf.bufferViews.size)
+    private val accessors = ArrayList<GLAccessor>(gltf.accessors.size)
+    private val meshes = ArrayList<GLMesh>(gltf.meshes.size)
+    private val nodes = ArrayList<GLNode>(gltf.nodes.size)
+    protected val scenes = ArrayList<GLScene>(gltf.scenes.size)
 
-    protected val primitivesNum = root.map("meshes") { it.count("primitives") }.sum()
-    private val startPrimitiveIndex = root.map("meshes") { it.count("primitives") }.sums()
+    protected val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
+    private val startPrimitiveIndex = gltf.meshes.map { it.primitives.size }.sums()
 
-    private val camerasNum = root.count("cameras")
+    private val camerasNum = gltf.cameras?.size ?: 0
     private val cameras = ArrayList<Camera>(camerasNum)
     protected val cameraNodes = ArrayList<GLNode>(camerasNum)
 
@@ -43,7 +41,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
         glGenBuffers(bufferId)
     }
 
-    final override fun visitBufferView(index: Int, bufferView: BufferView, jsonObject: JsonObject) {
+    final override fun visitBufferView(index: Int, bufferView: BufferView, json: JsonElement) {
         bufferViews.add(
                 with(bufferView) {
                     val data = data.buffers[buffer]
@@ -56,7 +54,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
         logger.fine { "Init ${bufferView.provideName("bufferView", index)}" }
     }
 
-    final override fun visitAccessor(index: Int, accessor: Accessor, jsonObject: JsonObject) {
+    final override fun visitAccessor(index: Int, accessor: Accessor, json: JsonElement) {
         accessors.add(
                 GLAccessor(
                         bufferViews[accessor.bufferView],
@@ -66,7 +64,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
                         numberOfComponents(accessor.type)))
     }
 
-    final override fun visitMesh(index: Int, mesh: Mesh, jsonObject: JsonObject) {
+    final override fun visitMesh(index: Int, mesh: Mesh, json: JsonElement) {
         val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
         mesh.primitives.forEachIndexed { j, primitive ->
             val primitiveIndex = startPrimitiveIndex[index] + j
@@ -88,7 +86,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
     abstract fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<String, GLAccessor>): GLPrimitive
     abstract fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>): GLPrimitive
 
-    final override fun visitCamera(index: Int, camera: kgltf.gltf.Camera, jsonObject: JsonObject) {
+    final override fun visitCamera(index: Int, camera: kgltf.gltf.Camera, json: JsonElement) {
         cameras.add(
                 when {
                     camera.perspective != null -> {
@@ -110,7 +108,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
         )
     }
 
-    final override fun visitNode(index: Int, node: Node, jsonObject: JsonObject) {
+    final override fun visitNode(index: Int, node: Node, json: JsonElement) {
         val transform = Transform()
         if (node.matrix != null) {
             transform.matrix = Matrix4f(
@@ -139,7 +137,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
         logger.fine { "Build ${node.provideName("node", index)}" }
     }
 
-    final override fun visitScene(index: Int, scene: Scene, jsonObject: JsonObject) {
+    final override fun visitScene(index: Int, scene: Scene, json: JsonElement) {
         scenes.add(GLScene(scene.nodes.map { nodes[it] }))
         logger.fine { "Build ${scene.provideName("scene", index)}" }
     }
@@ -147,10 +145,10 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
     abstract fun build(): GLRenderer
 
     companion object {
-        fun createRenderer(capabilities: GLCapabilities, gltf: JsonObject, data: GltfData): GLRenderer {
+        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, json: JsonElement, data: GltfData): GLRenderer {
             val builder = when {
-                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, data)
-                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, data)
+                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, json, data)
+                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, json, data)
                 else -> error("Cannot create renderer for the current GL capabilities")
             }
             builder.init()
@@ -160,7 +158,7 @@ abstract class GLRendererBuilder(root: JsonObject, data: GltfData) : Visitor(roo
     }
 }
 
-class GL2RendererBuilder(root: JsonObject, data: GltfData) : GLRendererBuilder(root, data) {
+class GL2RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData) : GLRendererBuilder(gltf, root, data) {
 
     override val programBuilder = ProgramBuilder("/shader/gl21")
 
@@ -176,7 +174,7 @@ class GL2RendererBuilder(root: JsonObject, data: GltfData) : GLRendererBuilder(r
     }
 }
 
-class GL3RendererBuilder(root: JsonObject, data: GltfData) : GLRendererBuilder(root, data) {
+class GL3RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData) : GLRendererBuilder(gltf, root, data) {
 
     override val programBuilder: ProgramBuilder = ProgramBuilder("/shader/gl33")
     private val vertexArrayId = IntArray(primitivesNum)

@@ -5,7 +5,8 @@ import kgltf.render.get
 import kgltf.render.gl.Shader.compile
 import kgltf.util.Disposable
 import kgltf.util.buildMap
-import kgltf.util.warn
+import kgltf.util.getAttributeLocation
+import kgltf.util.getUniformLocation
 import org.joml.Matrix4fc
 import org.lwjgl.opengl.GL11.GL_TRUE
 import org.lwjgl.opengl.GL20.*
@@ -39,10 +40,8 @@ class ProgramBuilder(val shaderDirectory: String) : Disposable {
         val shaders = collectShadersForProgram(name)
         val program = Program.link(shaders)
         shaders.forEach(::glDeleteShader)
-        val attributeMap = attributes.buildMap { glGetAttribLocation(program, it) }
-        warnAboutNegativeLocations(attributeMap, name)
-        val uniformMap = uniforms.buildMap { glGetUniformLocation(program, it) }
-        warnAboutNegativeLocations(uniformMap, name)
+        val attributeMap = attributes.buildMap { getAttributeLocation(program, it) }
+        val uniformMap = uniforms.buildMap { getUniformLocation(program, it) }
         return Program(name, program, attributeMap, uniformMap)
     }
 
@@ -57,14 +56,6 @@ class ProgramBuilder(val shaderDirectory: String) : Disposable {
     override fun dispose() {
         programs.values.forEach(Program::delete)
         programs.clear()
-    }
-
-    companion object {
-        private fun warnAboutNegativeLocations(locations: Map<String, Int>, programName: String) {
-            for ((name, location) in locations) {
-                warn(location < 0) { "'$name' has location $location in program '$programName'" }
-            }
-        }
     }
 }
 

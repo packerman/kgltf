@@ -112,11 +112,12 @@ abstract class GlfwApplication(val window: Long) : Application {
         }
 }
 
-data class Config(val width: Int = 640,
-                  val height: Int = 480,
-                  val title: String = "",
+data class Config(val width: Int,
+                  val height: Int,
+                  val title: String,
                   val profile: Int = GLFW_OPENGL_ANY_PROFILE,
                   val visible: Boolean = true,
+                  val samples: Int = GLFW_DONT_CARE,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
@@ -193,6 +194,7 @@ class Launcher(val config: Config, val profileFilter: ProfileFilter) {
         if (config.glDebug) {
             glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
         }
+        glfwWindowHint(GLFW_SAMPLES, config.samples)
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
         return glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)

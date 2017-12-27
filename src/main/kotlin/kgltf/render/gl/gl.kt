@@ -164,6 +164,10 @@ class GL3IndexedPrimitive(val vertexArray: Int,
     }
 }
 
+class GLMaterial {
+
+}
+
 class GLMesh(val primitives: List<GLPrimitive>) {
 
     private lateinit var program: Program
@@ -174,8 +178,7 @@ class GLMesh(val primitives: List<GLPrimitive>) {
     private val modelViewMatrix = Matrix4f()
 
     fun init(programBuilder: ProgramBuilder) {
-        val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
-        program = if (hasNormals) programBuilder["normal"] else programBuilder["flat"]
+        program = programBuilder["flat"]
         program.use {
             attributeLocations = getSemanticAttributesLocation(this)
             primitives.forEach { primitive ->

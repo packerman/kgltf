@@ -61,7 +61,7 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
         init {
             val directoryPropertyValue = requireNotNull(System.getProperty(directoryPropertyName)) { "You need to specify a directory with test assets in '$directoryPropertyName' property" }
             directory = File(directoryPropertyValue).absoluteFile.normalize()
-            check(directory.isDirectory)
+            check(directory.isDirectory) { "'$directory' is not a directory" }
         }
 
         @BeforeClass

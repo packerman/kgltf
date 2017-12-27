@@ -10,6 +10,7 @@ data class Gltf(val scenes: List<Scene>,
                 val buffers: List<Buffer>,
                 val bufferViews: List<BufferView>,
                 val accessors: List<Accessor>,
+                val materials: List<Material>,
                 val asset: Asset,
                 val extensionsRequired: List<String>?,
                 val extensionsUsed: List<String>?) {
@@ -54,7 +55,8 @@ data class Mesh(override val name: String?,
 
 data class Primitive(val attributes: Map<String, Int>,
                      val indices: Int?,
-                     val mode: Int?)
+                     val mode: Int?,
+                     val material: Int?)
 
 data class Buffer(override val name: String?,
                   val uri: String,
@@ -74,5 +76,7 @@ data class Accessor(override val name: String?,
                     val type: String,
                     val max: List<Float>,
                     val min: List<Float>) : Named
+
+data class Material(override val name: String?) : Named
 
 data class Asset(val version: String)

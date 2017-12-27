@@ -17,6 +17,7 @@ import org.junit.Test
 import org.lwjgl.stb.STBImage
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.logging.Logger
 
 abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVariant: Variant) {
     abstract val config: Config
@@ -41,7 +42,11 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
                     expectedScreenshotForModel(app.framebufferSize, testedSample).ensureImageFree { image ->
                         val expectedScreenshot = image.toArray()
                         assertThat(actualScreenshot.size, CoreMatchers.equalTo(expectedScreenshot.size))
-                        assertThat(similarity(actualScreenshot, expectedScreenshot), Matchers.greaterThan(requiredSimilarity))
+                        val similarity = similarity(actualScreenshot, expectedScreenshot)
+                        if (similarity < 1) {
+                            logger.info { "Similarity: $similarity" }
+                        }
+                        assertThat(similarity, Matchers.greaterThan(requiredSimilarity))
                     }
                     stop()
                 }
@@ -86,3 +91,5 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
                         .sum()
     }
 }
+
+private val logger = Logger.getLogger("testing")

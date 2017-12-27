@@ -3,9 +3,12 @@ package kgltf.app
 import com.google.gson.JsonElement
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
+import kgltf.app.glfw.FilterList
 import kgltf.app.glfw.Launcher
 import kgltf.data.Cache
-import kgltf.data.DataUri
+import kgltf.data.Downloader
+import kgltf.extension.GltfExtension
+import kgltf.extension.registerExtensions
 import kgltf.gltf.Gltf
 import kgltf.gltf.provideName
 import kgltf.util.fromJson
@@ -13,12 +16,55 @@ import kgltf.util.parseJson
 import java.io.File
 import java.io.IOException
 import java.net.URI
-import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.logging.Level
 import java.util.logging.LogManager
 import java.util.logging.Logger
+
+typealias LoadingFunction = (JsonElement) -> GltfExtension
+
+object ExtensionsLoader {
+
+    private val extensions = HashMap<String, LoadingFunction>()
+
+    fun registerExtension(extensionName: String, loadingFunction: LoadingFunction) {
+        extensions[extensionName] = loadingFunction
+    }
+
+    fun loadExtension(extensionName: String, jsonElement: JsonElement): GltfExtension? =
+            extensions[extensionName]?.invoke(jsonElement)
+}
+
+fun Gltf.isExtensionRequired(extensionName: String) =
+        extensionsRequired != null && extensionName in extensionsRequired
+
+class Downloading(val gltf: Gltf, val bufferFuture: List<Future<ByteArray>>) {
+    val buffers: List<ByteArray>
+        get() = bufferFuture.mapIndexed { index, future ->
+            val data = future.get()
+            val buffer = gltf.buffers[index]
+            check(data.size == buffer.byteLength)
+            logger.fine { "Download ${buffer.provideName("buffer", index)}" }
+            data
+        }
+}
+
+fun Downloading.collectData() = GltfData(buffers)
+
+fun Gltf.startDownloadData(downloader: Downloader) =
+        Downloading(this, bufferFuture = buffers.map { buffer ->
+            downloader.downloadBytes(buffer.uri)
+        })
+
+inline fun <R> ExecutorService.use(block: (ExecutorService) -> R): R {
+    try {
+        return block(this)
+    } finally {
+        shutdown()
+    }
+}
 
 class ApplicationRunner(val config: Config) {
 
@@ -30,42 +76,45 @@ class ApplicationRunner(val config: Config) {
 
     fun runByDelegate(uri: URI, delegateCreator: (Application) -> Application) {
         LoggingConfiguration.setUp()
+        registerExtensions()
         logger.info("Download files")
         Cache(downloadDirectory).use { cache ->
             val jsonTree = parseJson(cache.strings.get(uri))
             val gltf: Gltf = fromJson(jsonTree)
-            val data = downloadGltfData(uri, gltf, jsonTree, cache)
-            cache.flush()
+            val extensions = loadExtensions(gltf, jsonTree)
+            Executors.newFixedThreadPool(2).use { executor ->
+                val downloader = Downloader(uri, cache, executor)
+                val downloading = gltf.startDownloadData(downloader)
+                extensions.forEach { it.startDownloadFiles(downloader) }
+                val data = downloading.collectData()
+                extensions.forEach { it.collectDownloadedFiles() }
+                cache.flush()
 
-            logger.info("Init GL context")
-            Launcher(config).run { window: Long ->
-                delegateCreator(GltfViewer(window, gltf, jsonTree, data))
+                logger.info("Init GL context")
+                Launcher(config, FilterList(extensions)).run { window: Long ->
+                    delegateCreator(GltfViewer(window, gltf, jsonTree, data, extensions))
+                }
             }
         }
     }
 
-    private fun downloadGltfData(uri: URI, gltf: Gltf, jsonElement: JsonElement, cache: Cache): GltfData {
-        val executor = Executors.newFixedThreadPool(2)
-        try {
-            val bufferFutures: List<Future<ByteArray>> = gltf.buffers.mapIndexed { index, buffer ->
-                executor.submit(Callable<ByteArray> {
-                    val bufferUri = uri.resolve(buffer.uri)
-                    val data = when (bufferUri.scheme) {
-                        "http" -> cache.bytes.get(bufferUri)
-                        "https" -> cache.bytes.get(bufferUri)
-                        "data" -> DataUri.encode(bufferUri)
-                        else -> error("Unknown scheme ${bufferUri.scheme}")
-                    }
-                    check(data.size == buffer.byteLength)
-                    logger.fine { "Download ${buffer.provideName("buffer", index)}" }
-                    data
-                })
+    private fun loadExtensions(gltf: Gltf, jsonElement: JsonElement): List<GltfExtension> {
+        if (gltf.extensionsUsed == null) return emptyList()
+        val loadedExtensions = ArrayList<GltfExtension>(gltf.extensionsUsed.size)
+        gltf.extensionsUsed.forEach { extensionName ->
+            val extension = ExtensionsLoader.loadExtension(extensionName, jsonElement)
+            if (extension == null) {
+                if (gltf.isExtensionRequired(extensionName)) {
+                    error("Required extension $extensionName cannot be loaded ")
+                } else {
+                    logger.warning { "Extension $extensionName cannot be loaded, skipping" }
+                }
+            } else {
+                loadedExtensions.add(extension)
+                logger.info("Extension $extensionName loaded")
             }
-            val buffersData: List<ByteArray> = bufferFutures.map { it.get() }
-            return GltfData(buffersData)
-        } finally {
-            executor.shutdown()
         }
+        return loadedExtensions
     }
 }
 

@@ -10,7 +10,9 @@ data class Gltf(val scenes: List<Scene>,
                 val buffers: List<Buffer>,
                 val bufferViews: List<BufferView>,
                 val accessors: List<Accessor>,
-                val asset: Asset) {
+                val asset: Asset,
+                val extensionsRequired: List<String>?,
+                val extensionsUsed: List<String>?) {
 
     companion object {
         private val gson = Gson()
@@ -35,7 +37,8 @@ data class Node(override val name: String?,
                 val matrix: List<Float>?,
                 val rotation: List<Float>?,
                 val translation: List<Float>?,
-                val scale: List<Float>?) : Named
+                val scale: List<Float>?,
+                val children: List<Int>?) : Named
 
 data class Camera(override val name: String?,
                   val type: String,

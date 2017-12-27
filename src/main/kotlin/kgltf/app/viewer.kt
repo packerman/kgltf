@@ -2,6 +2,7 @@ package kgltf.app
 
 import com.google.gson.JsonElement
 import kgltf.app.glfw.GlfwApplication
+import kgltf.extension.GltfExtension
 import kgltf.gltf.Gltf
 import kgltf.render.Color
 import kgltf.render.Colors
@@ -15,7 +16,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
 
-class GltfViewer(window: Long, val gltf: Gltf, val json: JsonElement, val data: GltfData) : GlfwApplication(window) {
+class GltfViewer(window: Long, val gltf: Gltf, val json: JsonElement, val data: GltfData, val extensions: List<GltfExtension>) : GlfwApplication(window) {
 
     private lateinit var renderer: GLRenderer
 
@@ -30,6 +31,7 @@ class GltfViewer(window: Long, val gltf: Gltf, val json: JsonElement, val data: 
 
         val capabilities = GL.getCapabilities()
         renderer = GLRendererBuilder.createRenderer(capabilities, gltf, json, data)
+        extensions.forEach(GltfExtension::initialize)
 
         checkGLError()
     }

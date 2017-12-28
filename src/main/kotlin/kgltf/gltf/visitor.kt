@@ -12,6 +12,7 @@ abstract class Visitor(val gltf: Gltf, val jsonElement: JsonElement, val data: G
         val jsonObject = jsonElement.asJsonObject
         val jsonBufferViews = jsonObject.getAsJsonArray("bufferViews")
         val jsonAccessors = jsonObject.getAsJsonArray("accessors")
+        val jsonMaterials = jsonObject.getAsJsonArray("materials")
         val jsonMeshes = jsonObject.getAsJsonArray("meshes")
         val jsonCameras = jsonObject.getAsJsonArray("cameras")
         val jsonNodes = jsonObject.getAsJsonArray("nodes")
@@ -23,6 +24,12 @@ abstract class Visitor(val gltf: Gltf, val jsonElement: JsonElement, val data: G
                 visitBufferView(index, bufferView, jsonBufferViews.get(index))
             }
             accessors.forEachIndexed { index, accessor -> visitAccessor(index, accessor, jsonAccessors.get(index)) }
+            materials?.forEachIndexed { index, material ->
+                material.pbrMetallicRoughness?.baseColorFactor?.let {
+                    require(it.size == 4)
+                }
+                visitMaterial(index, material, jsonMaterials.get(index))
+            }
             meshes.forEachIndexed { index, mesh -> visitMesh(index, mesh, jsonMeshes.get(index)) }
             cameras?.forEachIndexed { index, camera ->
                 require(when (camera.type) {
@@ -46,6 +53,7 @@ abstract class Visitor(val gltf: Gltf, val jsonElement: JsonElement, val data: G
 
     abstract fun visitBufferView(index: Int, bufferView: BufferView, json: JsonElement)
     abstract fun visitAccessor(index: Int, accessor: Accessor, json: JsonElement)
+    abstract fun visitMaterial(index: Int, material: Material, json: JsonElement)
     abstract fun visitMesh(index: Int, mesh: Mesh, json: JsonElement)
     abstract fun visitCamera(index: Int, camera: Camera, json: JsonElement)
     abstract fun visitNode(index: Int, node: Node, json: JsonElement)

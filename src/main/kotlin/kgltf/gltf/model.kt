@@ -10,7 +10,7 @@ data class Gltf(val scenes: List<Scene>,
                 val buffers: List<Buffer>,
                 val bufferViews: List<BufferView>,
                 val accessors: List<Accessor>,
-                val materials: List<Material>,
+                val materials: List<Material>?,
                 val asset: Asset,
                 val extensionsRequired: List<String>?,
                 val extensionsUsed: List<String>?) {
@@ -77,6 +77,10 @@ data class Accessor(override val name: String?,
                     val max: List<Float>,
                     val min: List<Float>) : Named
 
-data class Material(override val name: String?) : Named
+data class Material(override val name: String?,
+                    val pbrMetallicRoughness: PbrMetallicRoughness?) : Named
+
+data class PbrMetallicRoughness(val baseColorFactor: List<Float>?,
+                                val metallicFactor: Float?)
 
 data class Asset(val version: String)

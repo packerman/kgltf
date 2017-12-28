@@ -2,6 +2,7 @@ package kgltf.render.gl
 
 import com.google.gson.JsonElement
 import kgltf.app.GltfData
+import kgltf.extension.GltfExtension
 import kgltf.gltf.*
 import kgltf.render.Camera
 import kgltf.render.OrthographicCamera
@@ -11,6 +12,7 @@ import kgltf.util.sums
 import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
+import org.joml.Vector4f
 import org.lwjgl.opengl.GL11.GL_TRIANGLES
 import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL30.glGenVertexArrays
@@ -18,7 +20,7 @@ import org.lwjgl.opengl.GLCapabilities
 import java.util.logging.Logger
 import kgltf.gltf.Camera as GltfCamera
 
-abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData) : Visitor(gltf, json, data) {
+abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, val extensions: List<GltfExtension>) : Visitor(gltf, json, data) {
 
     abstract val programBuilder: ProgramBuilder
 
@@ -26,6 +28,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData) 
 
     private val bufferViews = ArrayList<GLBufferView>(gltf.bufferViews.size)
     private val accessors = ArrayList<GLAccessor>(gltf.accessors.size)
+    private val materials = ArrayList<GLMaterial>(gltf.materials?.size ?: 0)
     private val meshes = ArrayList<GLMesh>(gltf.meshes.size)
     private val nodes = ArrayList<GLNode>(gltf.nodes.size)
     protected val scenes = ArrayList<GLScene>(gltf.scenes.size)
@@ -64,27 +67,56 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData) 
                         numberOfComponents(accessor.type)))
     }
 
+    private fun createMaterialFromExtension(index: Int): GLMaterial? =
+            extensions.asSequence()
+                    .map { it.createMaterial(index) }
+                    .firstOrNull { it != null }
+
+    private fun createPbrMaterial(material: Material): FlatMaterial {
+        val program = programBuilder["flat"]
+        val baseColorFactor = material.pbrMetallicRoughness?.baseColorFactor?.let { factor ->
+            Vector4f(factor[0], factor[1], factor[2], factor[3])
+        }
+        return if (baseColorFactor != null) FlatMaterial(program, baseColorFactor) else FlatMaterial(program)
+    }
+
+    override fun visitMaterial(index: Int, material: Material, json: JsonElement) {
+        materials.add(createMaterialFromExtension(index) ?: createPbrMaterial(material))
+    }
+
     final override fun visitMesh(index: Int, mesh: Mesh, json: JsonElement) {
+        fun getMaterial(primitive: Primitive) =
+                if (primitive.material != null)
+                    materials[primitive.material]
+                else
+                    FlatMaterial(programBuilder["flat"], Vector4f(0.5f, 0.5f, 0.5f, 1f))
+
+        fun getSemanticByName(name: String) =
+                requireNotNull(attributeSemantics[name]) { "Unknown attribute semantic '$name'" }
+
         val primitives = ArrayList<GLPrimitive>(mesh.primitives.size)
         mesh.primitives.forEachIndexed { j, primitive ->
             val primitiveIndex = startPrimitiveIndex[index] + j
             val mode = primitive.mode ?: GL_TRIANGLES
-            val attributes = primitive.attributes.mapValues { accessors[it.value] }
+            val attributes = primitive.attributes.entries.associateBy(
+                    { getSemanticByName(it.key) },
+                    { accessors[it.value] }
+            )
             val glPrimitive = if (primitive.indices != null) {
-                createIndexedPrimitive(primitiveIndex, accessors[primitive.indices], mode, attributes)
+                createIndexedPrimitive(primitiveIndex, accessors[primitive.indices], mode, attributes, getMaterial(primitive))
             } else {
-                createPrimitive(primitiveIndex, mode, attributes)
+                createPrimitive(primitiveIndex, mode, attributes, getMaterial(primitive))
             }
             primitives.add(glPrimitive)
         }
         val glMesh = GLMesh(primitives)
-        glMesh.init(programBuilder)
+        glMesh.init()
         meshes.add(glMesh)
         logger.fine { "Init ${mesh.provideName("mesh", index)}" }
     }
 
-    abstract fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<String, GLAccessor>): GLPrimitive
-    abstract fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>): GLPrimitive
+    abstract fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial): GLPrimitive
+    abstract fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial): GLPrimitive
 
     final override fun visitCamera(index: Int, camera: kgltf.gltf.Camera, json: JsonElement) {
         cameras.add(
@@ -145,10 +177,10 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData) 
     abstract fun build(): GLRenderer
 
     companion object {
-        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, json: JsonElement, data: GltfData): GLRenderer {
+        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, json: JsonElement, data: GltfData, extensions: List<GltfExtension>): GLRenderer {
             val builder = when {
-                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, json, data)
-                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, json, data)
+                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, json, data, extensions)
+                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, json, data, extensions)
                 else -> error("Cannot create renderer for the current GL capabilities")
             }
             builder.init()
@@ -158,15 +190,15 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData) 
     }
 }
 
-class GL2RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData) : GLRendererBuilder(gltf, root, data) {
+class GL2RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, root, data, extensions) {
 
     override val programBuilder = ProgramBuilder("/shader/gl21")
 
-    override fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<String, GLAccessor>) =
-            GL2IndexedPrimitive(indices, mode, attributes)
+    override fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial) =
+            GL2IndexedPrimitive(indices, mode, attributes, material)
 
-    override fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>) =
-            GL2Primitive(mode, attributes)
+    override fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial) =
+            GL2Primitive(mode, attributes, material)
 
     override fun build(): GLRenderer {
         return GLRenderer(scenes, cameraNodes,
@@ -174,7 +206,7 @@ class GL2RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData) : GLRend
     }
 }
 
-class GL3RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData) : GLRendererBuilder(gltf, root, data) {
+class GL3RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, root, data, extensions) {
 
     override val programBuilder: ProgramBuilder = ProgramBuilder("/shader/gl33")
     private val vertexArrayId = IntArray(primitivesNum)
@@ -184,11 +216,11 @@ class GL3RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData) : GLRend
         glGenVertexArrays(vertexArrayId)
     }
 
-    override fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<String, GLAccessor>) =
-            GL3IndexedPrimitive(vertexArrayId[primitiveIndex], indices, mode, attributes)
+    override fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial) =
+            GL3IndexedPrimitive(vertexArrayId[primitiveIndex], indices, mode, attributes, material)
 
-    override fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<String, GLAccessor>) =
-            GL3Primitive(vertexArrayId[primitiveIndex], mode, attributes)
+    override fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial) =
+            GL3Primitive(vertexArrayId[primitiveIndex], mode, attributes, material)
 
     override fun build(): GLRenderer {
         return GLRenderer(scenes, cameraNodes,

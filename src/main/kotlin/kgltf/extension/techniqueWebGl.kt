@@ -49,7 +49,7 @@ class TechniqueWebGl(val jsonElement: JsonElement) : GltfExtension(EXTENSION_NAM
             }
         }
         linkedPrograms = techniqueWebGl.programs.mapIndexed { i, program ->
-            val id = kgltf.render.gl.Program.link(
+            val id = kgltf.render.gl.GLProgram.link(
                     intArrayOf(compiledShaders[program.vertexShader],
                             compiledShaders[program.fragmentShader]))
             logger.fine { "Link program ${program.provideName("program", i)}" }
@@ -143,31 +143,6 @@ private val states = setOf(
         GL_DEPTH_TEST,
         GL_POLYGON_OFFSET_FILL,
         GL_SAMPLE_ALPHA_TO_COVERAGE
-)
-
-private val uniformSemantics = mapOf(
-        "LOCAL" to GL_FLOAT_MAT4,
-        "MODEL" to GL_FLOAT_MAT4,
-        "VIEW" to GL_FLOAT_MAT4,
-        "PROJECTION" to GL_FLOAT_MAT4,
-        "MODELVIEW" to GL_FLOAT_MAT4,
-        "MODELVIEWPROJECTION" to GL_FLOAT_MAT4,
-        "MODELINVERSE" to GL_FLOAT_MAT4,
-        "VIEWINVERSE" to GL_FLOAT_MAT4,
-        "PROJECTIONINVERSE" to GL_FLOAT_MAT4,
-        "MODELVIEWINVERSE" to GL_FLOAT_MAT4,
-        "MODELVIEWPROJECTIONINVERSE" to GL_FLOAT_MAT4,
-        "MODELINVERSETRANSPOSE" to GL_FLOAT_MAT3,
-        "MODELVIEWINVERSETRANSPOSE" to GL_FLOAT_MAT3,
-        "VIEWPORT" to GL_FLOAT_MAT4
-)
-
-private val attributeSemantics = setOf(
-        "POSITION",
-        "NORMAL",
-        "TEXCOORD_0",
-        "COLOR_0",
-        "JOINT"
 )
 
 private data class Program(

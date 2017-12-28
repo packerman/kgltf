@@ -30,9 +30,8 @@ class GltfViewer(window: Long, val gltf: Gltf, val json: JsonElement, val data: 
         setClearColor(Colors.BLACK)
 
         val capabilities = GL.getCapabilities()
-        renderer = GLRendererBuilder.createRenderer(capabilities, gltf, json, data, extensions)
         extensions.forEach(GltfExtension::initialize)
-
+        renderer = GLRendererBuilder.createRenderer(capabilities, gltf, json, data, extensions)
         checkGLError()
     }
 

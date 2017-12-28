@@ -5,7 +5,8 @@ import com.google.gson.JsonElement
 import kgltf.app.glfw.GLProfile
 import kgltf.data.Downloader
 import kgltf.gltf.Named
-import kgltf.gltf.provideName
+import kgltf.gltf.genericName
+import kgltf.render.gl.*
 import kgltf.util.buildMap
 import kgltf.util.fromJson
 import kgltf.util.getAttributeLocation
@@ -37,7 +38,7 @@ class TechniqueWebGl(val jsonElement: JsonElement) : GltfExtension(EXTENSION_NAM
     override fun collectDownloadedFiles() {
         shaderSources = futures.mapIndexed { i, future ->
             val source = future.get()
-            logger.fine { "Download ${techniqueWebGl.shaders[i].provideName("shader", i)}" }
+            logger.fine { "Download ${techniqueWebGl.shaders[i].genericName("shader", i)}" }
             source
         }
     }
@@ -45,41 +46,53 @@ class TechniqueWebGl(val jsonElement: JsonElement) : GltfExtension(EXTENSION_NAM
     override fun initialize() {
         compiledShaders = techniqueWebGl.shaders.mapIndexed { i, shader ->
             kgltf.render.gl.Shader.compile(shader.type, reformatSource(shaderSources[i])).also {
-                logger.fine { "Compile shader ${shader.provideName("shader", i)}" }
+                logger.fine { "Compile shader ${shader.genericName("shader", i)}" }
             }
         }
         linkedPrograms = techniqueWebGl.programs.mapIndexed { i, program ->
             val id = kgltf.render.gl.GLProgram.link(
                     intArrayOf(compiledShaders[program.vertexShader],
                             compiledShaders[program.fragmentShader]))
-            logger.fine { "Link program ${program.provideName("program", i)}" }
+            logger.fine { "Link program ${program.genericName("program", i)}" }
             val attributes = program.attributes.buildMap { getAttributeLocation(id, it) }
             LinkedProgram(id, attributes)
         }
         glTechniques = techniqueWebGl.techniques.map { buildGlTechnique(it) }
     }
 
+    override fun createMaterial(index: Int): GLMaterial? {
+        val material = techniqueWebGl.materials[index]
+        return material.technique?.let {
+            val technique = glTechniques[it]
+            TechniqueMaterial(technique)
+        }
+    }
+
     private fun buildGlTechnique(technique: Technique): GLTechnique = with(technique) {
         val program = linkedPrograms[program]
-        val attributeSemantics = HashMap<String, Int>()
+        val attributeMap = HashMap<Semantic, Int>()
         for ((attributeName, parameterName) in attributes) {
             val parameter = requireNotNull(parameters[parameterName]) { "No parameter for attribute '$attributeName' provided" }
-            val semantic: String = requireNotNull(parameter.semantic) { "Attribute parameter '$parameterName' has to have semantic" }
-            attributeSemantics[semantic] = getAttributeLocation(program.id, attributeName)
+            val semanticName = requireNotNull(parameter.semantic) { "Attribute parameter '$parameterName' has to have semantic" }
+            val semantic = requireNotNull(attributeSemantics[semanticName]) { "Unknown semantic name '$semanticName'" }
+            attributeMap[semantic] = getAttributeLocation(program.id, attributeName)
         }
-        val uniformSemantics = HashMap<String, Int>()
-        val parameterLocations = HashMap<String, Int>()
+        val uniformMap = HashMap<Semantic, Int>()
+        val parameterMap = HashMap<String, Int>()
         for ((uniformName, parameterName) in uniforms) {
             val parameter = requireNotNull(parameters[parameterName]) { "No parameter for uniform '$uniformName' provided" }
             val location = getUniformLocation(program.id, uniformName)
             if (parameter.semantic != null) {
-                uniformSemantics[parameter.semantic] = location
+                val semanticName = parameter.semantic
+                val semantic = requireNotNull(uniformSemantics[semanticName]) { "Unknown semantic name '$semanticName'" }
+                uniformMap[semantic] = location
             } else {
-                parameterLocations[parameterName] = location
+                parameterMap[parameterName] = location
             }
         }
+        val glProgram = GLProgram("", program.id, attributeMap, uniformMap, parameterMap)
         val toEnable = states?.enable ?: emptyList()
-        GLTechnique(program.id, toEnable, attributeSemantics, uniformSemantics, parameterLocations)
+        GLTechnique(glProgram, toEnable)
     }
 
     companion object {
@@ -104,8 +117,8 @@ private data class States(
         val enable: List<Int>?)
 
 private data class Material(
-        val values: Map<String, JsonArray>,
-        val technique: Int
+        val values: Map<String, JsonArray>?,
+        val technique: Int?
 )
 
 private data class Parameter(
@@ -173,10 +186,15 @@ private fun reformatSource(source: String): String = buildString {
     }
 }
 
-private data class GLTechnique(val program: Int,
-                               val states: List<Int>,
-                               val attributeSemantics: Map<String, Int>,
-                               val uniformSemantics: Map<String, Int>,
-                               val parameters: Map<String, Int>)
+private data class GLTechnique(val program: GLProgram,
+                               val states: List<Int>)
+
+private data class TechniqueMaterial(val technique: GLTechnique) : GLMaterial() {
+    override val program: GLProgram = technique.program
+
+    override fun applyToProgram() {
+
+    }
+}
 
 private val logger = Logger.getLogger("extension.technique.webgl")

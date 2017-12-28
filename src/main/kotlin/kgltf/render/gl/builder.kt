@@ -54,7 +54,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
                         unbind()
                     }
                 })
-        logger.fine { "Init ${bufferView.provideName("bufferView", index)}" }
+        logger.fine { "Init ${bufferView.genericName(index)}" }
     }
 
     final override fun visitAccessor(index: Int, accessor: Accessor, json: JsonElement) {
@@ -67,10 +67,16 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
                         numberOfComponents(accessor.type)))
     }
 
-    private fun createMaterialFromExtension(index: Int): GLMaterial? =
-            extensions.asSequence()
-                    .map { it.createMaterial(index) }
-                    .firstOrNull { it != null }
+    private fun createMaterialFromExtension(index: Int, material: Material): GLMaterial? {
+        for (extension in extensions) {
+            val extendedMaterial = extension.createMaterial(index)
+            if (extendedMaterial != null) {
+                logger.fine { "Material ${material.genericName(index)} extended by ${extension.name} extension" }
+                return extendedMaterial
+            }
+        }
+        return null
+    }
 
     private fun createPbrMaterial(material: Material): FlatMaterial {
         val program = programBuilder["flat"]
@@ -81,7 +87,8 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
     }
 
     override fun visitMaterial(index: Int, material: Material, json: JsonElement) {
-        materials.add(createMaterialFromExtension(index) ?: createPbrMaterial(material))
+        materials.add(createMaterialFromExtension(index, material) ?: createPbrMaterial(material))
+        logger.fine { "Init ${material.genericName(index)}" }
     }
 
     final override fun visitMesh(index: Int, mesh: Mesh, json: JsonElement) {
@@ -112,7 +119,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         val glMesh = GLMesh(primitives)
         glMesh.init()
         meshes.add(glMesh)
-        logger.fine { "Init ${mesh.provideName("mesh", index)}" }
+        logger.fine { "Init ${mesh.genericName(index)}" }
     }
 
     abstract fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial): GLPrimitive
@@ -166,12 +173,12 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         if (glNode.camera != null) {
             cameraNodes.add(glNode)
         }
-        logger.fine { "Build ${node.provideName("node", index)}" }
+        logger.fine { "Build ${node.genericName(index)}" }
     }
 
     final override fun visitScene(index: Int, scene: Scene, json: JsonElement) {
         scenes.add(GLScene(scene.nodes.map { nodes[it] }))
-        logger.fine { "Build ${scene.provideName("scene", index)}" }
+        logger.fine { "Build ${scene.genericName(index)}" }
     }
 
     abstract fun build(): GLRenderer

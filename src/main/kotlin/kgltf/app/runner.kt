@@ -10,7 +10,7 @@ import kgltf.data.Downloader
 import kgltf.extension.GltfExtension
 import kgltf.extension.registerExtensions
 import kgltf.gltf.Gltf
-import kgltf.gltf.provideName
+import kgltf.gltf.genericName
 import kgltf.util.fromJson
 import kgltf.util.parseJson
 import java.io.File
@@ -46,7 +46,7 @@ class Downloading(val gltf: Gltf, val bufferFuture: List<Future<ByteArray>>) {
             val data = future.get()
             val buffer = gltf.buffers[index]
             check(data.size == buffer.byteLength)
-            logger.fine { "Download ${buffer.provideName("buffer", index)}" }
+            logger.fine { "Download ${buffer.genericName("buffer", index)}" }
             data
         }
 }

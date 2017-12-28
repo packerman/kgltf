@@ -27,10 +27,12 @@ interface Named {
     val name: String?
 }
 
-fun Named.provideName(prefix: String, index: Int) = name ?: "${prefix}_$index"
+fun Named.genericName(prefix: String, index: Int) = name ?: "${prefix}_$index"
 
 data class Scene(override val name: String?,
                  val nodes: List<Int>) : Named
+
+fun Scene.genericName(i: Int) = genericName("scene", i)
 
 data class Node(override val name: String?,
                 val mesh: Int?,
@@ -40,6 +42,8 @@ data class Node(override val name: String?,
                 val translation: List<Float>?,
                 val scale: List<Float>?,
                 val children: List<Int>?) : Named
+
+fun Node.genericName(i: Int) = genericName("node", i)
 
 data class Camera(override val name: String?,
                   val type: String,
@@ -52,6 +56,8 @@ data class Orthographic(val xmag: Float, val ymag: Float, val znear: Float, val 
 
 data class Mesh(override val name: String?,
                 val primitives: List<Primitive>) : Named
+
+fun Mesh.genericName(i: Int) = genericName("mesh", i)
 
 data class Primitive(val attributes: Map<String, Int>,
                      val indices: Int?,
@@ -68,6 +74,8 @@ data class BufferView(override val name: String?,
                       val byteLength: Int,
                       val target: Int) : Named
 
+fun BufferView.genericName(i: Int) = genericName("bufferView", i)
+
 data class Accessor(override val name: String?,
                     val bufferView: Int,
                     val byteOffset: Int,
@@ -79,6 +87,8 @@ data class Accessor(override val name: String?,
 
 data class Material(override val name: String?,
                     val pbrMetallicRoughness: PbrMetallicRoughness?) : Named
+
+fun Material.genericName(i: Int) = genericName("material", i)
 
 data class PbrMetallicRoughness(val baseColorFactor: List<Float>?,
                                 val metallicFactor: Float?)

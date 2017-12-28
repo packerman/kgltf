@@ -39,7 +39,10 @@ abstract class Visitor(val gltf: Gltf, val jsonElement: JsonElement, val data: G
                 })
                 visitCamera(index, camera, jsonCameras.get(index))
             }
-            nodes.forEachIndexed { index, node ->
+            val sortedNodes = TopologicalSort(nodes).sorted
+
+            sortedNodes.forEach { index ->
+                val node = nodes[index]
                 require(node.matrix == null || (node.translation == null && node.rotation == null && node.scale == null))
                 require(node.matrix == null || node.matrix.size == 16)
                 require(node.translation == null || node.translation.size == 3)
@@ -82,5 +85,36 @@ abstract class Visitor(val gltf: Gltf, val jsonElement: JsonElement, val data: G
 
         fun numberOfComponents(type: String) =
                 requireNotNull(numberOfComponents[type]) { "Unknown type $type" }
+    }
+}
+
+class TopologicalSort(private val nodes: List<Node>) {
+
+    private val _sorted = ArrayList<Int>(nodes.size)
+    private val visited = HashSet<Int>(nodes.size)
+
+    init {
+        sort()
+        check(_sorted.size == nodes.size)
+        check(visited.size == nodes.size)
+    }
+
+    val sorted: List<Int> = _sorted
+
+    private fun sort() {
+        (0 until nodes.size).forEach { i ->
+            if (i !in visited) {
+                visit(i)
+            }
+        }
+    }
+
+    private fun visit(i: Int) {
+        nodes[i].children?.forEach { j ->
+            check(j !in visited)
+            visit(j)
+        }
+        visited.add(i)
+        _sorted.add(i)
     }
 }

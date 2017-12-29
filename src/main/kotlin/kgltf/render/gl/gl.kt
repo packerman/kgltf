@@ -6,10 +6,7 @@ import kgltf.render.Transform
 import kgltf.render.gl.UniformSemantic.ModelViewInverseTranspose
 import kgltf.render.gl.UniformSemantic.ModelViewProjection
 import kgltf.util.Disposable
-import org.joml.Matrix4f
-import org.joml.Matrix4fc
-import org.joml.Vector4f
-import org.joml.Vector4fc
+import org.joml.*
 import org.lwjgl.opengl.GL11.glDrawArrays
 import org.lwjgl.opengl.GL11.glDrawElements
 import org.lwjgl.opengl.GL15.*
@@ -70,22 +67,22 @@ abstract class GLPrimitive(val mode: Int,
     abstract fun draw()
     abstract fun unbind()
 
-    fun render(modelTransform: Transform, cameraTransform: CameraTransform) {
+    fun render(modelMatrix: Matrix4fc, cameraTransform: CameraTransform) {
         program.use {
-            applyMatrices(cameraTransform, modelTransform)
+            applyMatrices(cameraTransform, modelMatrix)
             material.applyToProgram()
             draw()
         }
     }
 
-    private fun GLProgram.applyMatrices(cameraTransform: CameraTransform, modelTransform: Transform) {
+    private fun GLProgram.applyMatrices(cameraTransform: CameraTransform, modelMatrix: Matrix4fc) {
         modelViewProjectionMatrix.set(cameraTransform.projectionViewMatrix)
-                .mul(modelTransform.matrix)
+                .mul(modelMatrix)
         uniformSemantics[ModelViewProjection]?.let { location ->
             UniformSetter.set(location, modelViewProjectionMatrix)
         }
         modelViewMatrix.set(cameraTransform.viewMatrix)
-                .mul(modelTransform.matrix)
+                .mul(modelMatrix)
         uniformSemantics[ModelViewInverseTranspose]?.let { location ->
             normalMatrix.set(modelViewMatrix).invert().transpose()
             UniformSetter.set(location, normalMatrix)
@@ -224,27 +221,43 @@ class GLMesh(val primitives: List<GLPrimitive>) {
         }
     }
 
-    fun render(modelTransform: Transform, cameraTransform: CameraTransform) {
-        primitives.forEach { it.render(modelTransform, cameraTransform) }
+    fun render(modelMatrix: Matrix4fc, cameraTransform: CameraTransform) {
+        primitives.forEach { it.render(modelMatrix, cameraTransform) }
     }
 }
 
 class GLNode(val transform: Transform,
+             val children: List<GLNode>,
              val mesh: GLMesh? = null,
              val camera: Camera? = null) {
 
-    fun render(cameraTransform: CameraTransform) {
-        mesh?.render(transform, cameraTransform)
+    fun render(cameraTransform: CameraTransform, matrixStack: MatrixStackf) {
+        matrixStack.pushMatrix()
+        matrixStack.mul(transform.matrix)
+        children.forEach { child ->
+            child.render(cameraTransform, matrixStack)
+        }
+        mesh?.render(matrixStack, cameraTransform)
+        matrixStack.popMatrix()
     }
 
     companion object {
-        internal val defaultCameraNode = GLNode(camera = IdentityCamera(), transform = Transform())
+        internal val emptyNode = GLNode(
+                transform = Transform(),
+                children = emptyList())
+        internal val defaultCameraNode = GLNode(
+                camera = IdentityCamera(),
+                transform = Transform(),
+                children = emptyList())
     }
 }
 
 class GLScene(val nodes: List<GLNode>) {
+
+    private val matrixStack = MatrixStackf(16)
+
     fun render(cameraTransform: CameraTransform) {
-        nodes.forEach { it.render(cameraTransform) }
+        nodes.forEach { it.render(cameraTransform, matrixStack) }
     }
 }
 

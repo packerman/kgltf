@@ -30,7 +30,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
     private val accessors = ArrayList<GLAccessor>(gltf.accessors.size)
     private val materials = ArrayList<GLMaterial>(gltf.materials?.size ?: 0)
     private val meshes = ArrayList<GLMesh>(gltf.meshes.size)
-    private val nodes = ArrayList<GLNode>(gltf.nodes.size)
+    private val nodes = Array(gltf.nodes.size) { GLNode.emptyNode }
     protected val scenes = ArrayList<GLScene>(gltf.scenes.size)
 
     protected val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
@@ -166,10 +166,12 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
                 transform.scale = Vector3f(node.scale[0], node.scale[1], node.scale[2])
             }
         }
+        val children = node.children?.map { nodes[it] } ?: emptyList()
         val glNode = GLNode(transform,
                 mesh = if (node.mesh != null) meshes[node.mesh] else null,
-                camera = if (node.camera != null) cameras[node.camera] else null)
-        nodes.add(glNode)
+                camera = if (node.camera != null) cameras[node.camera] else null,
+                children = children)
+        nodes[index] = glNode
         if (glNode.camera != null) {
             cameraNodes.add(glNode)
         }

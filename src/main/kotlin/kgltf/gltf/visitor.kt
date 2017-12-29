@@ -111,7 +111,7 @@ class TopologicalSort(private val nodes: List<Node>) {
 
     private fun visit(i: Int) {
         nodes[i].children?.forEach { j ->
-            check(j !in visited)
+            check(j !in visited) { "Scene graph node is not a proper tree" }
             visit(j)
         }
         visited.add(i)

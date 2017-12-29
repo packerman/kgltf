@@ -1,7 +1,8 @@
 package kgltf.app
 
 import kgltf.app.glfw.GlfwApplication
-import kgltf.gltf.Root
+import kgltf.extension.GltfExtension
+import kgltf.gltf.Gltf
 import kgltf.render.Color
 import kgltf.render.Colors
 import kgltf.render.gl.GLRenderer
@@ -14,7 +15,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
 
-class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplication(window) {
+class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData, val extensions: List<GltfExtension>) : GlfwApplication(window) {
 
     private lateinit var renderer: GLRenderer
 
@@ -24,11 +25,13 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     private val logger = Logger.getLogger("kgltf.viewer")
 
     override fun init() {
+        logger.info("Init application")
         setClearColor(Colors.BLACK)
 
         val capabilities = GL.getCapabilities()
-        renderer = GLRendererBuilder.createRenderer(capabilities, gltf, data)
-
+        extensions.forEach(GltfExtension::initialize)
+        renderer = GLRendererBuilder.createRenderer(capabilities, gltf, data, extensions)
+        renderer.init()
         checkGLError()
     }
 
@@ -37,7 +40,7 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     }
 
     override fun render() {
-        glClear(GL_COLOR_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
         if (renderer.camerasCount == 0) {
             renderer.render(sceneIndex)
         } else {
@@ -49,10 +52,14 @@ class GltfViewer(window: Long, val gltf: Root, val data: GltfData) : GlfwApplica
     override fun resize(width: Int, height: Int) {
         logger.info { "resize $width $height" }
         glViewport(0, 0, width, height)
+        renderer.resize(width, height)
+
     }
 
     override fun shutdown() {
-        renderer.dispose()
+        if (::renderer.isInitialized) {
+            renderer.dispose()
+        }
         checkGLError()
     }
 

@@ -8,7 +8,10 @@ import java.io.File
 import java.net.URI
 import java.net.URL
 import java.util.*
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 import java.util.logging.Logger
 
 class Cache(val cacheDirectory: File) : Closeable {
@@ -55,7 +58,8 @@ class Cache(val cacheDirectory: File) : Closeable {
                 logger.info { "Download $uri" }
                 val data = read(uri.toURL())
                 val (prefix, suffix) = File(uri.path).splitExt()
-                val newFile = File.createTempFile(prefix + "_", suffix, cacheDirectory)
+                val dash = if (prefix.length > 1) "-" else "--"
+                val newFile = File.createTempFile(prefix + dash, suffix, cacheDirectory)
                 write(newFile, data)
                 entries[uri] = FileEntry(newFile, Date())
                 data
@@ -85,6 +89,34 @@ class Cache(val cacheDirectory: File) : Closeable {
             return parsed
         }
     }
+}
+
+class Downloader(val baseUri: URI, val cache: Cache, val executorService: ExecutorService) {
+
+    fun downloadText(uri: String): Future<String> = downloadText(URI(uri))
+
+    fun downloadBytes(uri: String): Future<ByteArray> = downloadBytes(URI(uri))
+
+    fun downloadText(uri: URI): Future<String> = executorService.submit(
+            Callable<String> {
+                val resolvedUri = baseUri.resolve(uri)
+                when (resolvedUri.scheme) {
+                    "http", "https" -> cache.strings.get(resolvedUri)
+                    else -> error("Unknown scheme ${resolvedUri.scheme}")
+                }
+            }
+    )
+
+    fun downloadBytes(uri: URI): Future<ByteArray> = executorService.submit(
+            Callable<ByteArray> {
+                val resolvedUri = baseUri.resolve(uri)
+                when (resolvedUri.scheme) {
+                    "http", "https" -> cache.bytes.get(resolvedUri)
+                    "data" -> DataUri.encode(resolvedUri)
+                    else -> error("Unknown scheme ${resolvedUri.scheme}")
+                }
+            }
+    )
 }
 
 private val logger = Logger.getLogger("kgltf.data")

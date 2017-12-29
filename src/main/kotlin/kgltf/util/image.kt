@@ -12,7 +12,7 @@ fun loadImageFromFile(file: File): ByteBuffer {
         val x = stack.mallocInt(1)
         val y = stack.mallocInt(1)
         val channelsInFile = stack.mallocInt(1)
-        return requireNotNull(stbi_load(file.path, x, y, channelsInFile, 0)) { "Cannot load image ${stbi_failure_reason()}" }
+        return requireNotNull(stbi_load(file.path, x, y, channelsInFile, 0)) { "Cannot load image: ${stbi_failure_reason()}" }
     }
 }
 

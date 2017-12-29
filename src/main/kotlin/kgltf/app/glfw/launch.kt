@@ -13,46 +13,52 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import java.io.File
-import java.io.IOException
-import java.util.logging.Level
-import java.util.logging.LogManager
 import java.util.logging.Logger
 
 data class Size(val width: Int, val height: Int) {
     override fun toString(): String = "${width}x$height"
 }
 
-data class GLProfile(val majorVersion: Int,
+enum class GLProfile(val majorVersion: Int,
                      val minorVersion: Int,
                      val profile: Int,
                      val forwardCompatible: Boolean) {
+
+    OpenGl33(3, 3, GLFW_OPENGL_CORE_PROFILE, true),
+    OpenGl21(2, 1, GLFW_OPENGL_ANY_PROFILE, false);
+
     init {
         require(equalOrAbove(2, 1))
         require(equalOrAbove(3, 2) || profile == GLFW_OPENGL_ANY_PROFILE)
         require(equalOrAbove(3, 0) || !forwardCompatible)
     }
+}
 
-    fun equalOrAbove(major: Int, minor: Int): Boolean {
-        return when {
-            majorVersion > major -> true
-            majorVersion == major && minorVersion >= minor -> true
-            else -> false
-        }
-    }
-
-    fun acceptedBy(profileType: Int): Boolean {
-        return when (profileType) {
-            GLFW_OPENGL_ANY_PROFILE -> true
-            GLFW_OPENGL_COMPAT_PROFILE -> profile == GLFW_OPENGL_ANY_PROFILE || profile == GLFW_OPENGL_COMPAT_PROFILE
-            else -> profile == GLFW_OPENGL_CORE_PROFILE
-        }
+fun GLProfile.equalOrAbove(major: Int, minor: Int): Boolean {
+    return when {
+        majorVersion > major -> true
+        majorVersion == major && minorVersion >= minor -> true
+        else -> false
     }
 }
 
-val profiles = listOf(
-        GLProfile(3, 3, GLFW_OPENGL_CORE_PROFILE, true),
-        GLProfile(2, 1, GLFW_OPENGL_ANY_PROFILE, false)
-)
+interface ProfileFilter {
+    fun isProfileAccepted(profile: GLProfile): Boolean = true
+}
+
+class FilterList(val filters: List<ProfileFilter>) : ProfileFilter {
+    override fun isProfileAccepted(profile: GLProfile): Boolean =
+            filters.all { it.isProfileAccepted(profile) }
+}
+
+class ProfileTypeFilter(val type: Int) : ProfileFilter {
+    override fun isProfileAccepted(profile: GLProfile): Boolean =
+            when (type) {
+                GLFW_OPENGL_ANY_PROFILE -> true
+                GLFW_OPENGL_COMPAT_PROFILE -> profile.profile == GLFW_OPENGL_ANY_PROFILE || profile.profile == GLFW_OPENGL_COMPAT_PROFILE
+                else -> profile.profile == GLFW_OPENGL_CORE_PROFILE
+            }
+}
 
 interface Application {
     fun init()
@@ -106,11 +112,12 @@ abstract class GlfwApplication(val window: Long) : Application {
         }
 }
 
-data class Config(val width: Int = 640,
-                  val height: Int = 480,
-                  val title: String = "",
+data class Config(val width: Int,
+                  val height: Int,
+                  val title: String,
                   val profile: Int = GLFW_OPENGL_ANY_PROFILE,
                   val visible: Boolean = true,
+                  val samples: Int = GLFW_DONT_CARE,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
@@ -122,11 +129,9 @@ fun Config.changeProfile(newProfile: Int): Config {
     }
 }
 
-class Launcher(val config: Config) {
+class Launcher(val config: Config, val profileFilter: ProfileFilter) {
 
     fun run(createApplication: (Long) -> Application) {
-        LoggingConfiguration.setUp()
-
         GLFWErrorCallback.createPrint(System.err).set()
 
         if (!glfwInit()) {
@@ -172,8 +177,9 @@ class Launcher(val config: Config) {
     }
 
     private fun createWindowWithBestProfile(): Long {
-        return profiles.asSequence()
-                .filter { it.acceptedBy(config.profile) }
+        val typeFilter = ProfileTypeFilter(config.profile)
+        return GLProfile.values().asSequence()
+                .filter { typeFilter.isProfileAccepted(it) && profileFilter.isProfileAccepted(it) }
                 .map { tryCreateWindowWithProfile(it) }
                 .firstOrDefault(NULL) { it != NULL }
     }
@@ -188,6 +194,7 @@ class Launcher(val config: Config) {
         if (config.glDebug) {
             glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
         }
+        glfwWindowHint(GLFW_SAMPLES, config.samples)
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
         return glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
@@ -249,19 +256,5 @@ class Launcher(val config: Config) {
     }
 }
 
-object LoggingConfiguration {
+private val logger = Logger.getLogger("kgltf.app")
 
-    fun setUp() {
-        javaClass.getResourceAsStream(filePath).use { inputStream ->
-            try {
-                LogManager.getLogManager().readConfiguration(inputStream)
-            } catch (e: IOException) {
-                Logger.getGlobal().log(Level.SEVERE, e) { "Cannot read logging configuration from file: ${filePath}" }
-            }
-        }
-    }
-
-    private val filePath = "/logging.properties"
-}
-
-private val logger = Logger.getLogger("kgltf.launcher")

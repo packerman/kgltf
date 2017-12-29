@@ -12,7 +12,8 @@ class GL3ViewerTest(testedSample: KhronosSample, testedVariant: Variant) : Viewe
             width = 1024,
             height = 640,
             title = "test",
-            visible = false)
+            visible = false,
+            samples = 4)
 
     companion object {
 

@@ -1,14 +1,12 @@
 package kgltf.render.gl
 
 import kgltf.render.Camera
-import kgltf.render.Colors
 import kgltf.render.IdentityCamera
 import kgltf.render.Transform
+import kgltf.render.gl.UniformSemantic.*
 import kgltf.util.Disposable
-import org.joml.Matrix4f
-import org.joml.Matrix4fc
-import org.lwjgl.opengl.GL11.glDrawArrays
-import org.lwjgl.opengl.GL11.glDrawElements
+import org.joml.*
+import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
@@ -53,15 +51,51 @@ class GLAccessor(val bufferView: GLBufferView,
 }
 
 abstract class GLPrimitive(val mode: Int,
-                           val attributes: Map<String, GLAccessor>) {
+                           val attributes: Map<Semantic, GLAccessor>,
+                           val material: GLMaterial) {
 
     protected val targets: Set<Int> = attributes.values.mapTo(HashSet()) { it.bufferView.target }
+    protected val program = material.program
 
-    abstract fun init(attributeLocations: Map<String, Int>)
-    abstract fun render()
+    private val normalMatrix = Matrix4f()
+    private val normalMatrix3x3 = Matrix3f()
+    private val modelViewProjectionMatrix = Matrix4f()
+    private val modelViewMatrix = Matrix4f()
+
+    abstract fun init()
+    abstract fun draw()
     abstract fun unbind()
 
-    protected fun initAttributes(attributeLocations: Map<String, Int>) {
+    fun render(cameraTransform: CameraTransform, modelMatrix: Matrix4fc) {
+        program.use {
+            applyMatrices(cameraTransform, modelMatrix)
+            material.applyToProgram()
+            draw()
+        }
+    }
+
+    private fun GLProgram.applyMatrices(cameraTransform: CameraTransform, modelMatrix: Matrix4fc) {
+        uniformSemantics[Projection]?.let { location ->
+            UniformSetter.set(location, cameraTransform.projectionMatrix)
+        }
+        modelViewProjectionMatrix.set(cameraTransform.projectionViewMatrix)
+                .mul(modelMatrix)
+        uniformSemantics[ModelViewProjection]?.let { location ->
+            UniformSetter.set(location, modelViewProjectionMatrix)
+        }
+        modelViewMatrix.set(cameraTransform.viewMatrix)
+                .mul(modelMatrix)
+        uniformSemantics[ModelView]?.let { location ->
+            UniformSetter.set(location, modelViewMatrix)
+        }
+        uniformSemantics[ModelViewInverseTranspose]?.let { location ->
+            normalMatrix.set(modelViewMatrix).invert().transpose()
+            UniformSetter.set(location, normalMatrix.get3x3(normalMatrix3x3))
+        }
+    }
+
+    protected fun initAttributes() {
+        val attributeLocations = program.attributeSemantics
         attributes.forEach { (attribute, accessor) ->
             accessor.bufferView.bind()
             attributeLocations[attribute]?.let { location ->
@@ -79,17 +113,15 @@ abstract class GLPrimitive(val mode: Int,
 }
 
 class GL2Primitive(mode: Int,
-                   attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+                   attributes: Map<Semantic, GLAccessor>,
+                   material: GLMaterial) : GLPrimitive(mode, attributes, material) {
 
-    private val attributeLocations = HashMap<String, Int>()
     private val count = attributes.values.first().count
 
-    override fun init(attributeLocations: Map<String, Int>) {
-        this.attributeLocations.putAll(attributeLocations)
-    }
+    override fun init() {}
 
-    override fun render() {
-        initAttributes(attributeLocations)
+    override fun draw() {
+        initAttributes()
         glDrawArrays(mode, 0, count)
     }
 
@@ -100,15 +132,14 @@ class GL2Primitive(mode: Int,
 
 class GL2IndexedPrimitive(val indices: GLAccessor,
                           mode: Int,
-                          attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
-    private val attributeLocations = HashMap<String, Int>()
+                          attributes: Map<Semantic, GLAccessor>,
+                          material: GLMaterial) : GLPrimitive(mode, attributes, material) {
 
-    override fun init(attributeLocations: Map<String, Int>) {
-        this.attributeLocations.putAll(attributeLocations)
-    }
 
-    override fun render() {
-        initAttributes(attributeLocations)
+    override fun init() {}
+
+    override fun draw() {
+        initAttributes()
         indices.bufferView.bind()
         glDrawElements(mode, indices.count, indices.componentType, indices.byteOffset)
     }
@@ -121,16 +152,17 @@ class GL2IndexedPrimitive(val indices: GLAccessor,
 
 class GL3Primitive(val vertexArray: Int,
                    mode: Int,
-                   attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+                   attributes: Map<Semantic, GLAccessor>,
+                   material: GLMaterial) : GLPrimitive(mode, attributes, material) {
 
     private val count = attributes.values.first().count
 
-    override fun init(attributeLocations: Map<String, Int>) {
+    override fun init() {
         glBindVertexArray(vertexArray)
-        initAttributes(attributeLocations)
+        initAttributes()
     }
 
-    override fun render() {
+    override fun draw() {
         glBindVertexArray(vertexArray)
         glDrawArrays(mode, 0, count)
     }
@@ -144,15 +176,16 @@ class GL3Primitive(val vertexArray: Int,
 class GL3IndexedPrimitive(val vertexArray: Int,
                           val indices: GLAccessor,
                           mode: Int,
-                          attributes: Map<String, GLAccessor>) : GLPrimitive(mode, attributes) {
+                          attributes: Map<Semantic, GLAccessor>,
+                          material: GLMaterial) : GLPrimitive(mode, attributes, material) {
 
-    override fun init(attributeLocations: Map<String, Int>) {
+    override fun init() {
         glBindVertexArray(vertexArray)
-        initAttributes(attributeLocations)
+        initAttributes()
         indices.bufferView.bind()
     }
 
-    override fun render() {
+    override fun draw() {
         glBindVertexArray(vertexArray)
         glDrawElements(mode, indices.count, indices.componentType, indices.byteOffset)
     }
@@ -164,83 +197,78 @@ class GL3IndexedPrimitive(val vertexArray: Int,
     }
 }
 
-class GLMesh(val primitives: List<GLPrimitive>) {
+abstract class GLMaterial {
+    abstract val program: GLProgram
+    abstract fun applyToProgram()
+}
 
-    private lateinit var program: Program
-    private lateinit var attributeLocations: Map<String, Int>
+class FlatMaterial(override val program: GLProgram,
+                   val baseColorFactor: Vector4fc = defaultBaseColorFactor) : GLMaterial() {
 
-    private val normalMatrix = Matrix4f()
-    private val modelViewProjectionMatrix = Matrix4f()
-    private val modelViewMatrix = Matrix4f()
-
-    fun init(programBuilder: ProgramBuilder) {
-        val hasNormals = primitives.any { it.attributes.containsKey("NORMAL") }
-        program = if (hasNormals) programBuilder["normal"] else programBuilder["flat"]
-        program.use {
-            attributeLocations = getSemanticAttributesLocation(this)
-            primitives.forEach { primitive ->
-                primitive.init(attributeLocations)
-                validate()
-                primitive.unbind()
-            }
-        }
-    }
-
-    fun render(modelTransform: Transform, cameraTransform: CameraTransform) {
-        program.use {
-            uniforms[UniformName.MODEL_VIEW_PROJECTION_MATRIX]?.let { location ->
-                modelViewProjectionMatrix.set(cameraTransform.projectionViewMatrix)
-                        .mul(modelTransform.matrix)
-                UniformSetter.set(location, modelViewProjectionMatrix)
-            }
-            modelViewMatrix.set(cameraTransform.viewMatrix)
-                    .mul(modelTransform.matrix)
-            uniforms[UniformName.NORMAL_MATRIX]?.let { location ->
-                normalMatrix.set(modelViewMatrix).invert().transpose()
-                UniformSetter.set(location, normalMatrix)
-            }
-            uniforms[UniformName.COLOR]?.let { location ->
-                UniformSetter.set(location, Colors.GRAY)
-            }
-            primitives.forEach(GLPrimitive::render)
+    override fun applyToProgram() {
+        program.uniformParameters["color"]?.let { location ->
+            UniformSetter.set(location, baseColorFactor)
         }
     }
 
     companion object {
-        private val mapping = mapOf("POSITION" to AttributeName.POSITION,
-                "TEXCOORD_0" to "uv",
-                "NORMAL" to AttributeName.NORMAL)
+        val defaultBaseColorFactor: Vector4fc = Vector4f(1f, 1f, 1f, 1f)
+    }
+}
 
-        fun getSemanticAttributesLocation(program: Program) = HashMap<String, Int>().apply {
-            for ((semanticAttribute, programAttribute) in mapping) {
-                program.attributes[programAttribute]?.let { location ->
-                    set(semanticAttribute, location)
-                }
-            }
-        }.toMap()
+class GLMesh(val primitives: List<GLPrimitive>) {
+
+    fun init() {
+        primitives.forEach { primitive ->
+            primitive.init()
+            primitive.unbind()
+        }
+    }
+
+    fun render(modelMatrix: Matrix4fc, cameraTransform: CameraTransform) {
+        primitives.forEach { it.render(cameraTransform, modelMatrix) }
     }
 }
 
 class GLNode(val transform: Transform,
+             val children: List<GLNode>,
              val mesh: GLMesh? = null,
              val camera: Camera? = null) {
 
-    fun render(cameraTransform: CameraTransform) {
-        mesh?.render(transform, cameraTransform)
+    fun render(cameraTransform: CameraTransform, matrixStack: MatrixStackf) {
+        matrixStack.pushMatrix()
+        matrixStack.mul(transform.matrix)
+        children.forEach { child ->
+            child.render(cameraTransform, matrixStack)
+        }
+        mesh?.render(matrixStack, cameraTransform)
+        matrixStack.popMatrix()
     }
 
     companion object {
-        internal val defaultCameraNode = GLNode(camera = IdentityCamera(), transform = Transform())
+        internal val emptyNode = GLNode(
+                transform = Transform(),
+                children = emptyList())
+        internal val defaultCameraNode = GLNode(
+                camera = IdentityCamera(),
+                transform = Transform(),
+                children = emptyList())
     }
 }
 
 class GLScene(val nodes: List<GLNode>) {
+
+    private val matrixStack = MatrixStackf(16)
+
     fun render(cameraTransform: CameraTransform) {
-        nodes.forEach { it.render(cameraTransform) }
+        nodes.forEach { it.render(cameraTransform, matrixStack) }
     }
 }
 
 class CameraTransform {
+
+    private val _projectionMatrix = Matrix4f()
+    val projectionMatrix: Matrix4fc = _projectionMatrix
 
     private val _viewMatrix = Matrix4f()
     val viewMatrix: Matrix4fc = _viewMatrix
@@ -249,9 +277,9 @@ class CameraTransform {
     val projectionViewMatrix: Matrix4fc = _projectionViewMatrix
 
     fun set(camera: Camera, transform: Transform) {
-        _projectionViewMatrix
-                .set(camera.projectionMatrix)
-                .mul(transform.matrix.invert(_viewMatrix))
+        _projectionMatrix.set(camera.projectionMatrix)
+        _projectionMatrix
+                .mul(transform.matrix.invert(_viewMatrix), _projectionViewMatrix)
     }
 }
 
@@ -279,6 +307,11 @@ class GLRenderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val d
 
     private val cameraTransforms = CameraTransform()
 
+    fun init() {
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_CULL_FACE)
+    }
+
     fun render(sceneNum: Int, cameraNum: Int? = null) {
         require((cameraNum == null && cameraNodes.isEmpty()) ||
                 (cameraNum != null && (cameraNum in 0 until cameraNodes.size)))
@@ -287,6 +320,13 @@ class GLRenderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val d
         val cameraNode = if (cameraNum != null) cameraNodes[cameraNum] else GLNode.defaultCameraNode
 
         render(scenes[sceneNum], cameraNode)
+    }
+
+    fun resize(width: Int, height: Int) {
+        val aspectRatio = width.toFloat() / height
+        cameraNodes.forEach {
+            requireNotNull(it.camera).update(aspectRatio)
+        }
     }
 
     private fun render(scene: GLScene, cameraNode: GLNode) {

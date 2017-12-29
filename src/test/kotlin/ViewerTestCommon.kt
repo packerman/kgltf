@@ -1,7 +1,4 @@
-import kgltf.app.ApplicationRunner
-import kgltf.app.KhronosSample
-import kgltf.app.Variant
-import kgltf.app.getSampleModelUri
+import kgltf.app.*
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Size
@@ -17,6 +14,7 @@ import org.junit.Test
 import org.lwjgl.stb.STBImage
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.logging.Logger
 
 abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVariant: Variant) {
     abstract val config: Config
@@ -33,20 +31,25 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
     @Test
     fun testModelAndVariant() {
         val uri = getSampleModelUri(testedSample, testedVariant)
-        runner.runByDelegate(uri) { app ->
-            object : Application by app {
-                override fun render() {
-                    app.render()
-                    val actualScreenshot = app.screenshot()
-                    expectedScreenshotForModel(app.framebufferSize, testedSample).ensureImageFree { image ->
-                        val expectedScreenshot = image.toArray()
-                        assertThat(actualScreenshot.size, CoreMatchers.equalTo(expectedScreenshot.size))
-                        assertThat(similarity(actualScreenshot, expectedScreenshot), Matchers.greaterThan(requiredSimilarity))
+        object : SampleApplicationRunner(config, testedSample) {
+            override fun delegateApplication(application: Application): Application =
+                    object : Application by application {
+                        override fun render() {
+                            application.render()
+                            val actualScreenshot = application.screenshot()
+                            expectedScreenshotForModel(application.framebufferSize, testedSample, testedVariant).ensureImageFree { image ->
+                                val expectedScreenshot = image.toArray()
+                                assertThat(actualScreenshot.size, CoreMatchers.equalTo(expectedScreenshot.size))
+                                val similarity = similarity(actualScreenshot, expectedScreenshot)
+                                if (similarity < 1) {
+                                    logger.info { "Similarity: $similarity" }
+                                }
+                                assertThat(similarity, Matchers.greaterThan(requiredSimilarity))
+                            }
+                            stop()
+                        }
                     }
-                    stop()
-                }
-            }
-        }
+        }.runFor(uri)
     }
 
     companion object {
@@ -56,7 +59,7 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
         init {
             val directoryPropertyValue = requireNotNull(System.getProperty(directoryPropertyName)) { "You need to specify a directory with test assets in '$directoryPropertyName' property" }
             directory = File(directoryPropertyValue).absoluteFile.normalize()
-            check(directory.isDirectory)
+            check(directory.isDirectory) { "'$directory' is not a directory" }
         }
 
         @BeforeClass
@@ -65,11 +68,14 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
             STBImage.stbi_set_flip_vertically_on_load(true)
         }
 
-        fun expectedScreenshotForModel(size: Size, sample: KhronosSample): ByteBuffer {
+        fun expectedScreenshotForModel(size: Size, sample: KhronosSample, variant: Variant): ByteBuffer {
             val screenshotDirectory = directory
                     .resolve("screenshots")
                     .resolve("${size.width}x${size.height}")
-            val screenshotFile = screenshotDirectory.resolve("${sample.name}.png")
+            val variantScreenshotFile = screenshotDirectory.resolve("${sample.name}_${variant.name}.png")
+            val screenshotFile =
+                    if (variantScreenshotFile.exists()) variantScreenshotFile
+                    else screenshotDirectory.resolve("${sample.name}.png")
             return loadImageFromFile(screenshotFile)
         }
 
@@ -86,3 +92,5 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
                         .sum()
     }
 }
+
+private val logger = Logger.getLogger("testing")

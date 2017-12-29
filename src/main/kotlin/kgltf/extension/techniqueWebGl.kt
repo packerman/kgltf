@@ -63,8 +63,16 @@ class TechniqueWebGl(val jsonElement: JsonElement) : GltfExtension(EXTENSION_NAM
     override fun createMaterial(index: Int): GLMaterial? {
         val material = techniqueWebGl.materials[index]
         return material.technique?.let {
-            val technique = glTechniques[it]
-            TechniqueMaterial(technique)
+            val technique = techniqueWebGl.techniques[it]
+            val glTechnique = glTechniques[it]
+            val program = glTechnique.program
+            val setters = HashMap<String, ParameterValueSetter>()
+            for (parameter in program.uniformParameters.keys) {
+                val value = requireNotNull(material.values?.get(parameter))
+                val type = requireNotNull(technique.parameters[parameter]).type
+                setters[parameter] = createParameterValueSetter(value, type)
+            }
+            TechniqueMaterial(glTechnique, setters)
         }
     }
 
@@ -150,6 +158,28 @@ private val supportedTypes: Set<Int> = setOf(
         GL_SAMPLER_2D
 )
 
+typealias ParameterValueSetter = (Int) -> Unit
+
+fun createParameterValueSetter(value: JsonArray, type: Int): ParameterValueSetter {
+    fun JsonArray.getFloat(i: Int) = get(i).asJsonPrimitive.asFloat
+    when (type) {
+        GL_FLOAT_VEC4 -> {
+            check(value.size() == 4)
+            val v0 = value.getFloat(0)
+            val v1 = value.getFloat(1)
+            val v2 = value.getFloat(2)
+            val v3 = value.getFloat(3)
+            return { location -> glUniform4f(location, v0, v1, v2, v3) }
+        }
+        GL_FLOAT -> {
+            check(value.size() == 1)
+            val v0 = value.getFloat(0)
+            return { location -> glUniform1f(location, v0) }
+        }
+        else -> error("Unknown type $type")
+    }
+}
+
 private val states = setOf(
         GL_BLEND,
         GL_CULL_FACE,
@@ -189,11 +219,15 @@ private fun reformatSource(source: String): String = buildString {
 private data class GLTechnique(val program: GLProgram,
                                val states: List<Int>)
 
-private data class TechniqueMaterial(val technique: GLTechnique) : GLMaterial() {
+private data class TechniqueMaterial(val technique: GLTechnique,
+                                     val setters: Map<String, ParameterValueSetter>) : GLMaterial() {
     override val program: GLProgram = technique.program
 
     override fun applyToProgram() {
-
+        setters.forEach { (name, setter) ->
+            val location = requireNotNull(program.uniformParameters[name])
+            setter(location)
+        }
     }
 }
 

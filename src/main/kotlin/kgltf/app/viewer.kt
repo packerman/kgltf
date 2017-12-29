@@ -32,6 +32,7 @@ class GltfViewer(window: Long, val gltf: Gltf, val json: JsonElement, val data: 
         val capabilities = GL.getCapabilities()
         extensions.forEach(GltfExtension::initialize)
         renderer = GLRendererBuilder.createRenderer(capabilities, gltf, json, data, extensions)
+        renderer.init()
         checkGLError()
     }
 

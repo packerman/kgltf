@@ -3,12 +3,10 @@ package kgltf.render.gl
 import kgltf.render.Camera
 import kgltf.render.IdentityCamera
 import kgltf.render.Transform
-import kgltf.render.gl.UniformSemantic.ModelViewInverseTranspose
-import kgltf.render.gl.UniformSemantic.ModelViewProjection
+import kgltf.render.gl.UniformSemantic.*
 import kgltf.util.Disposable
 import org.joml.*
-import org.lwjgl.opengl.GL11.glDrawArrays
-import org.lwjgl.opengl.GL11.glDrawElements
+import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
@@ -60,6 +58,7 @@ abstract class GLPrimitive(val mode: Int,
     protected val program = material.program
 
     private val normalMatrix = Matrix4f()
+    private val normalMatrix3x3 = Matrix3f()
     private val modelViewProjectionMatrix = Matrix4f()
     private val modelViewMatrix = Matrix4f()
 
@@ -67,7 +66,7 @@ abstract class GLPrimitive(val mode: Int,
     abstract fun draw()
     abstract fun unbind()
 
-    fun render(modelMatrix: Matrix4fc, cameraTransform: CameraTransform) {
+    fun render(cameraTransform: CameraTransform, modelMatrix: Matrix4fc) {
         program.use {
             applyMatrices(cameraTransform, modelMatrix)
             material.applyToProgram()
@@ -76,6 +75,9 @@ abstract class GLPrimitive(val mode: Int,
     }
 
     private fun GLProgram.applyMatrices(cameraTransform: CameraTransform, modelMatrix: Matrix4fc) {
+        uniformSemantics[Projection]?.let { location ->
+            UniformSetter.set(location, cameraTransform.projectionMatrix)
+        }
         modelViewProjectionMatrix.set(cameraTransform.projectionViewMatrix)
                 .mul(modelMatrix)
         uniformSemantics[ModelViewProjection]?.let { location ->
@@ -83,9 +85,12 @@ abstract class GLPrimitive(val mode: Int,
         }
         modelViewMatrix.set(cameraTransform.viewMatrix)
                 .mul(modelMatrix)
+        uniformSemantics[ModelView]?.let { location ->
+            UniformSetter.set(location, modelViewMatrix)
+        }
         uniformSemantics[ModelViewInverseTranspose]?.let { location ->
             normalMatrix.set(modelViewMatrix).invert().transpose()
-            UniformSetter.set(location, normalMatrix)
+            UniformSetter.set(location, normalMatrix.get3x3(normalMatrix3x3))
         }
     }
 
@@ -217,12 +222,11 @@ class GLMesh(val primitives: List<GLPrimitive>) {
         primitives.forEach { primitive ->
             primitive.init()
             primitive.unbind()
-
         }
     }
 
     fun render(modelMatrix: Matrix4fc, cameraTransform: CameraTransform) {
-        primitives.forEach { it.render(modelMatrix, cameraTransform) }
+        primitives.forEach { it.render(cameraTransform, modelMatrix) }
     }
 }
 
@@ -263,6 +267,9 @@ class GLScene(val nodes: List<GLNode>) {
 
 class CameraTransform {
 
+    private val _projectionMatrix = Matrix4f()
+    val projectionMatrix: Matrix4fc = _projectionMatrix
+
     private val _viewMatrix = Matrix4f()
     val viewMatrix: Matrix4fc = _viewMatrix
 
@@ -270,9 +277,9 @@ class CameraTransform {
     val projectionViewMatrix: Matrix4fc = _projectionViewMatrix
 
     fun set(camera: Camera, transform: Transform) {
-        _projectionViewMatrix
-                .set(camera.projectionMatrix)
-                .mul(transform.matrix.invert(_viewMatrix))
+        _projectionMatrix.set(camera.projectionMatrix)
+        _projectionMatrix
+                .mul(transform.matrix.invert(_viewMatrix), _projectionViewMatrix)
     }
 }
 
@@ -299,6 +306,11 @@ class GLRenderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val d
     val camerasCount: Int = cameraNodes.size
 
     private val cameraTransforms = CameraTransform()
+
+    fun init() {
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_CULL_FACE)
+    }
 
     fun render(sceneNum: Int, cameraNum: Int? = null) {
         require((cameraNum == null && cameraNodes.isEmpty()) ||

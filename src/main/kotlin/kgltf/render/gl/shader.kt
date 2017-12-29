@@ -10,6 +10,7 @@ import kgltf.render.gl.UniformSemantic.ModelViewProjection
 import kgltf.util.Disposable
 import kgltf.util.getAttributeLocation
 import kgltf.util.getUniformLocation
+import org.joml.Matrix3fc
 import org.joml.Matrix4fc
 import org.joml.Vector4fc
 import org.lwjgl.BufferUtils
@@ -163,10 +164,15 @@ val attributeSemantics: Map<String, Semantic> = AttributeSemantic.values().assoc
 object UniformSetter {
     private val color = FloatArray(4)
     private val matrix4f = BufferUtils.createFloatBuffer(16)
+    private val matrix3f = BufferUtils.createFloatBuffer(9)
     private val vector4f = BufferUtils.createFloatBuffer(4)
 
     fun set(location: Int, value: Matrix4fc) {
         glUniformMatrix4fv(location, false, value.get(matrix4f))
+    }
+
+    fun set(location: Int, value: Matrix3fc) {
+        glUniformMatrix3fv(location, false, value.get(matrix3f))
     }
 
     fun set(location: Int, value: Color) {

@@ -15,6 +15,8 @@ enum class KhronosSample(val variants: Set<Variant> = VariantSet.basic,
     override fun toString() = sampleName
 }
 
+fun getSampleByName(name: String): KhronosSample? = KhronosSample.values().firstOrNull { it.sampleName == name }
+
 enum class Variant(val value: String, val useExperimentalExtensions: Boolean = false) {
     Gltf("glTF"),
     GltfEmbedded("glTF-Embedded"),
@@ -22,6 +24,8 @@ enum class Variant(val value: String, val useExperimentalExtensions: Boolean = f
 
     override fun toString() = value
 }
+
+fun getVariantByName(name: String): Variant? = Variant.values().firstOrNull { it.value == name }
 
 object VariantSet {
     val basic = setOf(Variant.Gltf, Variant.GltfEmbedded)

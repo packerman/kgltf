@@ -23,6 +23,24 @@ data class Gltf(val scenes: List<Scene>,
     }
 }
 
+fun Gltf.addCamera(name: String, camera: Camera, transform: List<Float>): Gltf {
+    val cameraList = (cameras ?: emptyList()).toMutableList()
+    val nodeList = nodes.toMutableList()
+    val newNode = Node(name = name,
+            camera = cameraList.size,
+            matrix = transform)
+    val newScenes = scenes.map { scene ->
+        val sceneNodes = scene.nodes.toMutableList()
+        sceneNodes.add(nodeList.size)
+        scene.copy(nodes = sceneNodes)
+    }
+    cameraList.add(camera)
+    nodeList.add(newNode)
+    return copy(scenes = newScenes,
+            nodes = nodeList,
+            cameras = cameraList)
+}
+
 interface Named {
     val name: String?
 }
@@ -34,21 +52,30 @@ data class Scene(override val name: String?,
 
 fun Scene.genericName(i: Int) = genericName("scene", i)
 
-data class Node(override val name: String?,
-                val mesh: Int?,
-                val camera: Int?,
-                val matrix: List<Float>?,
-                val rotation: List<Float>?,
-                val translation: List<Float>?,
-                val scale: List<Float>?,
-                val children: List<Int>?) : Named
+data class Node(override val name: String? = null,
+                val mesh: Int? = null,
+                val camera: Int? = null,
+                val matrix: List<Float>? = null,
+                val rotation: List<Float>? = null,
+                val translation: List<Float>? = null,
+                val scale: List<Float>? = null,
+                val children: List<Int>? = null) : Named
 
 fun Node.genericName(i: Int) = genericName("node", i)
 
 data class Camera(override val name: String?,
                   val type: String,
                   val perspective: Perspective?,
-                  val orthographic: Orthographic?) : Named
+                  val orthographic: Orthographic?) : Named {
+
+    companion object {
+        fun of(perspective: Perspective): Camera =
+                Camera(null, "perspective", perspective, null)
+
+        fun of(orthographic: Orthographic): Camera =
+                Camera(null, "orthographic", null, orthographic)
+    }
+}
 
 data class Perspective(val aspectRatio: Float, val yfov: Float, val znear: Float, val zfar: Float?)
 

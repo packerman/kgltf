@@ -57,19 +57,17 @@ class Transform {
 
 interface Camera {
     val projectionMatrix: Matrix4fc
+    fun update(aspectRatio: Float)
 }
 
 class PerspectiveCamera(var aspectRatio: Float, val yFov: Float, val zNear: Float, val zFar: Float = Float.POSITIVE_INFINITY) : Camera {
 
     private val _projectionMatrix = Matrix4f()
 
-    init {
-        update()
-    }
-
     override val projectionMatrix: Matrix4fc = _projectionMatrix
 
-    fun update() {
+    override fun update(aspectRatio: Float) {
+        this.aspectRatio = aspectRatio
         _projectionMatrix.setPerspective(yFov, aspectRatio, zNear, zFar)
     }
 }
@@ -78,17 +76,18 @@ class OrthographicCamera(var xMag: Float, var yMag: Float, val zNear: Float, val
 
     private val _projectionMatrix = Matrix4f()
 
-    init {
-        update()
-    }
-
     override val projectionMatrix: Matrix4fc = _projectionMatrix
 
-    fun update() {
-        _projectionMatrix.setOrthoSymmetric(2 * xMag, 2 * yMag, zNear, zFar)
+    override fun update(aspectRatio: Float) {
+        if (aspectRatio > xMag / yMag) {
+            _projectionMatrix.setOrthoSymmetric(2 * yMag * aspectRatio, 2 * yMag, zNear, zFar)
+        } else {
+            _projectionMatrix.setOrthoSymmetric(2 * xMag, 2 * xMag / aspectRatio, zNear, zFar)
+        }
     }
 }
 
 class IdentityCamera : Camera {
     override val projectionMatrix: Matrix4fc = Matrix4f()
+    override fun update(aspectRatio: Float) {}
 }

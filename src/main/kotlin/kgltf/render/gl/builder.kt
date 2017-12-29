@@ -1,6 +1,5 @@
 package kgltf.render.gl
 
-import com.google.gson.JsonElement
 import kgltf.app.GltfData
 import kgltf.extension.GltfExtension
 import kgltf.gltf.*
@@ -20,7 +19,7 @@ import org.lwjgl.opengl.GLCapabilities
 import java.util.logging.Logger
 import kgltf.gltf.Camera as GltfCamera
 
-abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, val extensions: List<GltfExtension>) : Visitor(gltf, json, data) {
+abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: List<GltfExtension>) : Visitor(gltf, data) {
 
     abstract val programBuilder: ProgramBuilder
 
@@ -44,7 +43,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         glGenBuffers(bufferId)
     }
 
-    final override fun visitBufferView(index: Int, bufferView: BufferView, json: JsonElement) {
+    final override fun visitBufferView(index: Int, bufferView: BufferView) {
         bufferViews.add(
                 with(bufferView) {
                     val data = data.buffers[buffer]
@@ -57,7 +56,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         logger.fine { "Init ${bufferView.genericName(index)}" }
     }
 
-    final override fun visitAccessor(index: Int, accessor: Accessor, json: JsonElement) {
+    final override fun visitAccessor(index: Int, accessor: Accessor) {
         accessors.add(
                 GLAccessor(
                         bufferViews[accessor.bufferView],
@@ -86,12 +85,12 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         return if (baseColorFactor != null) FlatMaterial(program, baseColorFactor) else FlatMaterial(program)
     }
 
-    override fun visitMaterial(index: Int, material: Material, json: JsonElement) {
+    override fun visitMaterial(index: Int, material: Material) {
         materials.add(createMaterialFromExtension(index, material) ?: createPbrMaterial(material))
         logger.fine { "Init ${material.genericName(index)}" }
     }
 
-    final override fun visitMesh(index: Int, mesh: Mesh, json: JsonElement) {
+    final override fun visitMesh(index: Int, mesh: Mesh) {
         fun getMaterial(primitive: Primitive) =
                 if (primitive.material != null)
                     materials[primitive.material]
@@ -125,7 +124,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
     abstract fun createIndexedPrimitive(primitiveIndex: Int, indices: GLAccessor, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial): GLPrimitive
     abstract fun createPrimitive(primitiveIndex: Int, mode: Int, attributes: Map<Semantic, GLAccessor>, material: GLMaterial): GLPrimitive
 
-    final override fun visitCamera(index: Int, camera: kgltf.gltf.Camera, json: JsonElement) {
+    final override fun visitCamera(index: Int, camera: kgltf.gltf.Camera) {
         cameras.add(
                 when {
                     camera.perspective != null -> {
@@ -147,7 +146,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         )
     }
 
-    final override fun visitNode(index: Int, node: Node, json: JsonElement) {
+    final override fun visitNode(index: Int, node: Node) {
         val transform = Transform()
         if (node.matrix != null) {
             transform.matrix = Matrix4f(
@@ -178,7 +177,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
         logger.fine { "Build ${node.genericName(index)}" }
     }
 
-    final override fun visitScene(index: Int, scene: Scene, json: JsonElement) {
+    final override fun visitScene(index: Int, scene: Scene) {
         scenes.add(GLScene(scene.nodes.map { nodes[it] }))
         logger.fine { "Build ${scene.genericName(index)}" }
     }
@@ -186,10 +185,10 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
     abstract fun build(): GLRenderer
 
     companion object {
-        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, json: JsonElement, data: GltfData, extensions: List<GltfExtension>): GLRenderer {
+        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, data: GltfData, extensions: List<GltfExtension>): GLRenderer {
             val builder = when {
-                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, json, data, extensions)
-                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, json, data, extensions)
+                capabilities.OpenGL33 -> GL3RendererBuilder(gltf, data, extensions)
+                capabilities.OpenGL21 -> GL2RendererBuilder(gltf, data, extensions)
                 else -> error("Cannot create renderer for the current GL capabilities")
             }
             builder.init()
@@ -199,7 +198,7 @@ abstract class GLRendererBuilder(gltf: Gltf, json: JsonElement, data: GltfData, 
     }
 }
 
-class GL2RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, root, data, extensions) {
+class GL2RendererBuilder(gltf: Gltf, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, data, extensions) {
 
     override val programBuilder = ProgramBuilder("/shader/gl21")
 
@@ -215,7 +214,7 @@ class GL2RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData, extensio
     }
 }
 
-class GL3RendererBuilder(gltf: Gltf, root: JsonElement, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, root, data, extensions) {
+class GL3RendererBuilder(gltf: Gltf, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, data, extensions) {
 
     override val programBuilder: ProgramBuilder = ProgramBuilder("/shader/gl33")
     private val vertexArrayId = IntArray(primitivesNum)

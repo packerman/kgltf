@@ -37,23 +37,23 @@ class TechniqueWebGl(val jsonElement: JsonElement) : GltfExtension(EXTENSION_NAM
 
     override fun collectDownloadedFiles() {
         shaderSources = futures.mapIndexed { i, future ->
-            val source = future.get()
-            logger.fine { "Download ${techniqueWebGl.shaders[i].genericName("shader", i)}" }
-            source
+            future.get().also {
+                logger.fine { "Download ${techniqueWebGl.shaders[i].genericName(i)}" }
+            }
         }
     }
 
     override fun initialize() {
         compiledShaders = techniqueWebGl.shaders.mapIndexed { i, shader ->
             kgltf.render.gl.Shader.compile(shader.type, reformatSource(shaderSources[i])).also {
-                logger.fine { "Compile shader ${shader.genericName("shader", i)}" }
+                logger.fine { "Compile shader ${shader.genericName(i)}" }
             }
         }
         linkedPrograms = techniqueWebGl.programs.mapIndexed { i, program ->
             val id = kgltf.render.gl.GLProgram.link(
                     intArrayOf(compiledShaders[program.vertexShader],
                             compiledShaders[program.fragmentShader]))
-            logger.fine { "Link program ${program.genericName("program", i)}" }
+            logger.fine { "Link program ${program.genericName(i)}" }
             val attributes = program.attributes.buildMap { getAttributeLocation(id, it) }
             LinkedProgram(id, attributes)
         }
@@ -194,10 +194,14 @@ private data class Program(
         val vertexShader: Int,
         override val name: String?) : Named
 
+private fun Program.genericName(i: Int) = genericName("program", i)
+
 private data class Shader(
         val type: Int,
         val uri: String,
         override val name: String?) : Named
+
+private fun Shader.genericName(i: Int) = genericName("shader", i)
 
 private data class LinkedProgram(val id: Int,
                                  val attributes: Map<String, Int>)

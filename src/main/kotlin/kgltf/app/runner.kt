@@ -66,21 +66,18 @@ inline fun <R> ExecutorService.use(block: (ExecutorService) -> R): R {
     }
 }
 
-class ApplicationRunner(val config: Config) {
+open class ApplicationRunner(val config: Config) {
 
     private val downloadDirectory = File("downloaded_files")
 
     fun runFor(uri: URI) {
-        runByDelegate(uri) { it }
-    }
-
-    fun runByDelegate(uri: URI, delegateCreator: (Application) -> Application) {
         LoggingConfiguration.setUp()
         registerExtensions()
         logger.info("Download files")
         Cache(downloadDirectory).use { cache ->
             val jsonTree = parseJson(cache.strings.get(uri))
             val gltf: Gltf = fromJson(jsonTree)
+            val transformedGltf = transformGltfModel(gltf)
             val extensions = loadExtensions(gltf, jsonTree)
             Executors.newFixedThreadPool(2).use { executor ->
                 val downloader = Downloader(uri, cache, executor)
@@ -92,11 +89,15 @@ class ApplicationRunner(val config: Config) {
 
                 logger.info("Init GL context")
                 Launcher(config, FilterList(extensions)).run { window: Long ->
-                    delegateCreator(GltfViewer(window, gltf, jsonTree, data, extensions))
+                    delegateApplication(GltfViewer(window, transformedGltf, data, extensions))
                 }
             }
         }
     }
+
+    open fun delegateApplication(application: Application): Application = application
+
+    open fun transformGltfModel(gltf: Gltf): Gltf = gltf
 
     private fun loadExtensions(gltf: Gltf, jsonElement: JsonElement): List<GltfExtension> {
         if (gltf.extensionsUsed == null) return emptyList()

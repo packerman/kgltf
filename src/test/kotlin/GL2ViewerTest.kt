@@ -14,7 +14,8 @@ class GL2ViewerTest(testedSample: KhronosSample, testedVariant: Variant) : Viewe
             height = 640,
             title = "test",
             visible = false,
-            profile = GLFW_OPENGL_COMPAT_PROFILE)
+            profile = GLFW_OPENGL_COMPAT_PROFILE,
+            samples = 4)
 
     companion object {
 

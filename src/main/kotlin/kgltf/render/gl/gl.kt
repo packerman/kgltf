@@ -322,6 +322,13 @@ class GLRenderer(val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val d
         render(scenes[sceneNum], cameraNode)
     }
 
+    fun resize(width: Int, height: Int) {
+        val aspectRatio = width.toFloat() / height
+        cameraNodes.forEach {
+            requireNotNull(it.camera).update(aspectRatio)
+        }
+    }
+
     private fun render(scene: GLScene, cameraNode: GLNode) {
         val camera = requireNotNull(cameraNode.camera)
         cameraTransforms.set(camera, cameraNode.transform)

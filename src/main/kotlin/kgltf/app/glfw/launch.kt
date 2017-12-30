@@ -1,6 +1,5 @@
 package kgltf.app.glfw
 
-import kgltf.util.firstOrDefault
 import kgltf.util.makeScreenshot
 import kgltf.util.saveScreenshot
 import org.lwjgl.glfw.Callbacks.glfwFreeCallbacks
@@ -32,6 +31,12 @@ enum class GLProfile(val majorVersion: Int,
         require(equalOrAbove(3, 2) || profile == GLFW_OPENGL_ANY_PROFILE)
         require(equalOrAbove(3, 0) || !forwardCompatible)
     }
+
+    override fun toString(): String {
+        return "GL $majorVersion.$minorVersion (profile=$profile, forwardCompatible=$forwardCompatible)"
+    }
+
+
 }
 
 fun GLProfile.equalOrAbove(major: Int, minor: Int): Boolean {
@@ -121,14 +126,6 @@ data class Config(val width: Int,
                   val glDebug: Boolean = false,
                   val stickyKeys: Boolean = false)
 
-fun Config.changeProfile(newProfile: Int): Config {
-    return when (profile) {
-        GLFW_OPENGL_ANY_PROFILE -> copy(profile = newProfile)
-        newProfile -> this
-        else -> error("Cannot change the profile")
-    }
-}
-
 class Launcher(val config: Config, val profileFilter: ProfileFilter) {
 
     fun run(createApplication: (Long) -> Application) {
@@ -178,10 +175,19 @@ class Launcher(val config: Config, val profileFilter: ProfileFilter) {
 
     private fun createWindowWithBestProfile(): Long {
         val typeFilter = ProfileTypeFilter(config.profile)
-        return GLProfile.values().asSequence()
-                .filter { typeFilter.isProfileAccepted(it) && profileFilter.isProfileAccepted(it) }
-                .map { tryCreateWindowWithProfile(it) }
-                .firstOrDefault(NULL) { it != NULL }
+        for (profile in GLProfile.values()) {
+            val accepted = typeFilter.isProfileAccepted(profile) && profileFilter.isProfileAccepted(profile)
+            if (!accepted) {
+                logger.finer { "Skipping profile $profile" }
+                continue
+            }
+            logger.finer { "Trying profile $profile" }
+            val window = tryCreateWindowWithProfile(profile)
+            if (window != NULL) {
+                return window
+            }
+        }
+        return NULL
     }
 
     private fun tryCreateWindowWithProfile(profile: GLProfile): Long {

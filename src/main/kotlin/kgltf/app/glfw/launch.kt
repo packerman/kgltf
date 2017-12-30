@@ -193,9 +193,7 @@ class Launcher(val config: Config, val profileFilter: ProfileFilter) {
     private fun tryCreateWindowWithProfile(profile: GLProfile): Long {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, profile.majorVersion)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, profile.minorVersion)
-        if (profile.forwardCompatible) {
-            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
-        }
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, if (profile.forwardCompatible) GLFW_TRUE else GLFW_FALSE)
         glfwWindowHint(GLFW_OPENGL_PROFILE, profile.profile)
         if (config.glDebug) {
             glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)

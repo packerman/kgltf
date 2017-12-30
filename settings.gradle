@@ -1,2 +1,8 @@
 rootProject.name = 'kgltf'
+include 'viewer'
+include 'opengl-render'
+include 'extensions'
+include 'common'
+include 'gltf'
+include 'download'
 

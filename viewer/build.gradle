@@ -1,0 +1,37 @@
+
+apply plugin: 'application'
+mainClassName = 'kgltf.app.MainKt'
+applicationDefaultJvmArgs = ['-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions']
+
+test {
+    jvmArgs '-Dkgltf.test.asset.directory=../kgltf-test-assets', '-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions'
+    forkEvery = 1
+    maxParallelForks = 1
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
+
+    compile project(':gltf')
+    compile project(':opengl-render')
+    compile project(':extensions')
+
+    testCompile ("junit:junit:$junitVersion") {
+        exclude module: 'hamcrest-core'
+    }
+    testCompile "org.hamcrest:hamcrest-all:$hamcrestVersion"
+
+    compile "com.google.code.gson:gson:$gsonVersion"
+
+    compile "org.joml:joml:$jomlVersion"
+
+    compile "org.lwjgl:lwjgl:$lwjglVersion"
+    compile "org.lwjgl:lwjgl:$lwjglVersion:natives-windows"
+    compile "org.lwjgl:lwjgl:$lwjglVersion:natives-linux"
+    compile "org.lwjgl:lwjgl:$lwjglVersion:natives-macos"
+
+    compile "org.lwjgl:lwjgl-glfw:$lwjglVersion"
+    compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-windows"
+    compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-linux"
+    compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-macos"
+}

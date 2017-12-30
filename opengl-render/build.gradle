@@ -1,0 +1,22 @@
+
+
+
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    compile project(':common')
+
+    compile "org.joml:joml:$jomlVersion"
+
+    compile "org.lwjgl:lwjgl-opengl:$lwjglVersion"
+    compile "org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-windows"
+    compile "org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-linux"
+    compile "org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-macos"
+
+    compile "org.lwjgl:lwjgl-stb:$lwjglVersion"
+    compile "org.lwjgl:lwjgl-stb:$lwjglVersion:natives-windows"
+    compile "org.lwjgl:lwjgl-stb:$lwjglVersion:natives-linux"
+    compile "org.lwjgl:lwjgl-stb:$lwjglVersion:natives-macos"
+}
+

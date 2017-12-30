@@ -1,4 +1,7 @@
-import kgltf.app.*
+import kgltf.app.KhronosSample
+import kgltf.app.SampleApplicationRunner
+import kgltf.app.Variant
+import kgltf.app.getSampleModelUri
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Size
@@ -21,11 +24,8 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
 
     private val requiredSimilarity = 0.99
 
-    private lateinit var runner: ApplicationRunner
-
     @Before
     fun setUp() {
-        runner = ApplicationRunner(config)
     }
 
     @Test
@@ -85,7 +85,7 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
             return (expectedRandomDistance - distance).toDouble() / expectedRandomDistance
         }
 
-        fun byteArrayDistance(first: ByteArray, second: ByteArray) =
+        private fun byteArrayDistance(first: ByteArray, second: ByteArray) =
                 first.zip(second)
                         .asSequence()
                         .map { (b1, b2) -> Math.abs(b1 - b2).toLong() }

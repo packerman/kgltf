@@ -25,14 +25,14 @@ sourceCompatibility = 1.8
 
 apply plugin: 'application'
 mainClassName = 'kgltf.app.MainKt'
-applicationDefaultJvmArgs = ['-XstartOnFirstThread']
+applicationDefaultJvmArgs = ['-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions']
 
 repositories {
     mavenCentral()
 }
 
 test {
-    jvmArgs '-Dkgltf.test.asset.directory=../kgltf-test-assets', '-XstartOnFirstThread'
+    jvmArgs '-Dkgltf.test.asset.directory=../kgltf-test-assets', '-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions'
     forkEvery = 1
     maxParallelForks = 1
 }

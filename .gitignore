@@ -97,6 +97,7 @@ Temporary Items
 .apdisk
 
 .idea
+*.iml
 
 screenshot_*.png
 screenshot_images/

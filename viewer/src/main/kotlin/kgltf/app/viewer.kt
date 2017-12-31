@@ -67,6 +67,7 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData, val extension
     override fun onKey(key: Int, action: Int, x: Double, y: Double) {
         fun keyPressed(keySymbol: Int) = key == keySymbol && action == GLFW_PRESS
         when {
+            keyPressed(GLFW_KEY_ESCAPE) -> stop()
             keyPressed(GLFW_KEY_C) -> if (renderer.camerasCount > 0) {
                 cameraIndex = (cameraIndex + 1) % renderer.camerasCount
             }
@@ -79,6 +80,7 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData, val extension
                 val savedFile = screenshot(fileName)
                 logger.info("Saved screenshot to ${savedFile}")
             }
+            keyPressed(GLFW_KEY_F) -> toggleFullscreen()
         }
     }
 }

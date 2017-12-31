@@ -1,0 +1,11 @@
+
+dependencies {
+    compile project(':gltf')
+    compile project(':download')
+    compile project(':opengl-render')
+
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    compile "com.google.code.gson:gson:$gsonVersion"
+}
+

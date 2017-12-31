@@ -4,7 +4,7 @@ mainClassName = 'kgltf.app.MainKt'
 applicationDefaultJvmArgs = ['-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions']
 
 test {
-    jvmArgs '-Dkgltf.test.asset.directory=../kgltf-test-assets', '-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions'
+    jvmArgs '-Dkgltf.test.asset.directory=../../kgltf-test-assets', '-XstartOnFirstThread', '-XX:+IgnoreUnrecognizedVMOptions'
     forkEvery = 1
     maxParallelForks = 1
 }

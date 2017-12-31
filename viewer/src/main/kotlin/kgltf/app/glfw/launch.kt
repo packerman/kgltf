@@ -43,6 +43,8 @@ interface Application {
     fun onKey(key: Int, action: Int, x: Double, y: Double) {}
     fun getKeyState(key: Int): Int
 
+    fun toggleFullscreen()
+
     fun screenshot(): ByteArray
     fun screenshot(fileName: String): File
 
@@ -51,11 +53,18 @@ interface Application {
 }
 
 abstract class GlfwApplication(val window: Long) : Application {
+
+    private val fullscreenToggle = FullscreenToggle(window)
+
     override fun stop() {
         glfwSetWindowShouldClose(window, true)
     }
 
     override fun getKeyState(key: Int): Int = glfwGetKey(window, key)
+
+    override fun toggleFullscreen() {
+        fullscreenToggle.toggle()
+    }
 
     override fun screenshot(): ByteArray = makeScreenshot(window)
 
@@ -82,9 +91,36 @@ abstract class GlfwApplication(val window: Long) : Application {
         }
 }
 
+class FullscreenToggle(private val window: Long) {
+
+    private val xpos = intArrayOf(0)
+    private val ypos = intArrayOf(0)
+    private val width = intArrayOf(0)
+    private val height = intArrayOf(0)
+
+    fun toggle() {
+        val monitor = glfwGetWindowMonitor(window)
+        if (monitor == NULL) {
+            glfwGetWindowSize(window, width, height)
+            glfwGetWindowPos(window, xpos, ypos)
+            val primaryMonitor = glfwGetPrimaryMonitor()
+            val mode = glfwGetVideoMode(primaryMonitor)
+            glfwSetWindowMonitor(window, primaryMonitor, 0, 0, mode.width(), mode.height(), mode.refreshRate())
+            return
+        }
+        if (width[0] < 1 || height[0] < 1) {
+            logger.warning { "Cannot set windowed mode" }
+            return
+        }
+        glfwSetWindowMonitor(window, NULL,
+                xpos[0], ypos[0], width[0], height[0], GLFW_DONT_CARE)
+    }
+}
+
 data class Config(val width: Int,
                   val height: Int,
                   val title: String,
+                  val fullscreen: Boolean = false,
                   val profile: Int = GLFW_OPENGL_ANY_PROFILE,
                   val visible: Boolean = true,
                   val samples: Int = GLFW_DONT_CARE,
@@ -173,7 +209,17 @@ class Launcher(val config: Config, val profileFilter: ProfileFilter) {
         glfwWindowHint(GLFW_SAMPLES, config.samples)
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-        return glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
+        return if (config.fullscreen) {
+            val monitor = glfwGetPrimaryMonitor()
+            val mode = glfwGetVideoMode(monitor)
+            glfwWindowHint(GLFW_RED_BITS, mode.redBits())
+            glfwWindowHint(GLFW_GREEN_BITS, mode.greenBits())
+            glfwWindowHint(GLFW_BLUE_BITS, mode.blueBits())
+            glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate())
+            glfwCreateWindow(mode.width(), mode.height(), config.title, monitor, NULL)
+        } else {
+            glfwCreateWindow(config.width, config.height, config.title, NULL, NULL)
+        }
     }
 
     private class Runtime(val window: Long, val app: Application) {

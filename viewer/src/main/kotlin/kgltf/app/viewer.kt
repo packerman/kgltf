@@ -27,7 +27,7 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData, val extension
 
     override fun init() {
         logger.info("Init application")
-        setClearColor(Colors.BLACK)
+        setClearColor(Colors.GRAY)
 
         val capabilities = GL.getCapabilities()
         extensions.forEach(GltfExtension::initialize)

@@ -83,6 +83,8 @@ abstract class Visitor(val gltf: Gltf, val data: GltfData) {
         const val NEAREST_MIPMAP_LINEAR = 9986
         const val LINEAR_MIPMAP_LINEAR = 9987
 
+        val mipMappingFilters = setOf(NEAREST_MIPMAP_NEAREST, LINEAR_MIPMAP_NEAREST, NEAREST_MIPMAP_LINEAR, LINEAR_MIPMAP_LINEAR)
+
         val magFilters = setOf(NEAREST, LINEAR)
         val minFilters = setOf(NEAREST, LINEAR, NEAREST_MIPMAP_NEAREST, LINEAR_MIPMAP_NEAREST, NEAREST_MIPMAP_LINEAR, LINEAR_MIPMAP_LINEAR)
 

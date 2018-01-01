@@ -142,6 +142,9 @@ data class Material(override val name: String?,
 fun Material.genericName(i: Int) = genericName("material", i)
 
 data class PbrMetallicRoughness(val baseColorFactor: List<Float>?,
+                                val baseColorTexture: ColorTexture?,
                                 val metallicFactor: Float?)
+
+data class ColorTexture(val index: Int)
 
 data class Asset(val version: String)

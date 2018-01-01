@@ -13,6 +13,8 @@ import org.joml.Quaternionf
 import org.joml.Vector3f
 import org.joml.Vector4f
 import org.lwjgl.opengl.GL11.*
+import org.lwjgl.opengl.GL13.GL_TEXTURE0
+import org.lwjgl.opengl.GL13.glActiveTexture
 import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL30.glGenVertexArrays
 import org.lwjgl.opengl.GLCapabilities
@@ -63,16 +65,17 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
     override fun visitTexture(index: Int, texture: Texture) {
         val sampler = texture.sampler?.let { gltf.samplers?.get(it) }
         val parameters = GLTextureParameters(
-                magFilter = sampler?.magFilter,
-                minFilter = sampler?.minFilter,
+                magFilter = sampler?.magFilter ?: GL_LINEAR,
+                minFilter = sampler?.minFilter ?: GL_NEAREST_MIPMAP_LINEAR,
                 wrapS = sampler?.wrapS ?: GL_REPEAT,
                 wrapT = sampler?.wrapT ?: GL_REPEAT
         )
         val data = texture.source?.let { data.images[it] } ?: error("No source data for texture ${texture.genericName(index)}")
         val glTexture = GLTexture(textureId[index], parameters).apply {
+            glActiveTexture(GL_TEXTURE0)
             bind()
             initWithData(data)
-            unbind()
+//            unbind()
         }
         textures.add(glTexture)
         logger.fine { "Init ${texture.genericName(index)}" }
@@ -99,12 +102,16 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
         return null
     }
 
-    private fun createPbrMaterial(material: Material): FlatMaterial {
-        val program = programBuilder["flat"]
+    private fun createPbrMaterial(material: Material): GLMaterial {
         val baseColorFactor = material.pbrMetallicRoughness?.baseColorFactor?.let { factor ->
             Vector4f(factor[0], factor[1], factor[2], factor[3])
+        } ?: Vector4f(1f, 1f, 1f, 1f)
+        val texture = material.pbrMetallicRoughness?.baseColorTexture?.index?.let { textures[it] }
+        return if (texture != null) {
+            TextureMaterial(programBuilder["texture"], baseColorFactor)
+        } else {
+            FlatMaterial(programBuilder["flat"], baseColorFactor)
         }
-        return if (baseColorFactor != null) FlatMaterial(program, baseColorFactor) else FlatMaterial(program)
     }
 
     override fun visitMaterial(index: Int, material: Material) {

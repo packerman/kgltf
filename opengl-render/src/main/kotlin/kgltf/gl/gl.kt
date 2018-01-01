@@ -8,14 +8,17 @@ import kgltf.util.Disposable
 import kgltf.util.ensureMemoryFree
 import org.joml.*
 import org.lwjgl.opengl.GL11.*
+import org.lwjgl.opengl.GL13.GL_TEXTURE0
+import org.lwjgl.opengl.GL13.glActiveTexture
+import org.lwjgl.opengl.GL14.GL_MIRRORED_REPEAT
 import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
-import org.lwjgl.opengl.GL20.glVertexAttribPointer
-import org.lwjgl.opengl.GL30.glBindVertexArray
-import org.lwjgl.opengl.GL30.glDeleteVertexArrays
+import org.lwjgl.opengl.GL20.*
+import org.lwjgl.opengl.GL30.*
 import org.lwjgl.stb.STBImage.*
+import org.lwjgl.stb.STBImageResize.stbir_resize_uint8
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
+import java.nio.ByteBuffer
 
 class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 
@@ -43,19 +46,29 @@ fun GLBufferView.initWithData(data: ByteArray, offset: Int = 0) {
     copyBufferData(data, offset)
 }
 
-data class GLTextureParameters(val magFilter: Int?, val minFilter: Int?,
+data class GLTextureParameters(val magFilter: Int, val minFilter: Int,
                                val wrapS: Int, val wrapT: Int) {
     fun apply() {
-        magFilter?.let { glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, it) }
-        minFilter?.let { glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, it) }
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT)
+    }
+
+    val usesMipmapping = minFilter in mipmappingFilters
+    val needsPowerOfTwo = (wrapS in wrappingModeNeedingPowerOfTwo) || (wrapT in wrappingModeNeedingPowerOfTwo) ||
+            usesMipmapping
+
+    companion object {
+        val mipmappingFilters = setOf(GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_LINEAR)
+        val wrappingModeNeedingPowerOfTwo = setOf(GL_REPEAT, GL_MIRRORED_REPEAT)
     }
 }
 
 class GLTexture(val texture: Int, val parameters: GLTextureParameters) {
 
     fun bind() {
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, texture)
     }
 
@@ -72,14 +85,51 @@ class GLTexture(val texture: Int, val parameters: GLTextureParameters) {
                 val height = stack.mallocInt(1)
                 val channels = stack.mallocInt(1)
                 val image = stbi_load_from_memory(buffer, width, height, channels, 0) ?: error("Failed to load image: ${stbi_failure_reason()}")
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width[0], height[0], 0, GL_RGB, GL_UNSIGNED_BYTE, image)
+                val potWidth = powerOfTwoNotLess(width[0])
+                val potHeight = powerOfTwoNotLess(height[0])
+                if (width[0] != potHeight || height[0] != potWidth) {
+                    resizeImage(image, width[0], height[0], potWidth, potHeight, channels[0])?.ensureMemoryFree { resizedImage ->
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, potWidth, potHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, resizedImage)
+                    } ?: error("Cannot resize image")
+                } else {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width[0], height[0], 0, GL_RGB, GL_UNSIGNED_BYTE, image)
+                }
                 stbi_image_free(image)
             }
+        }
+        if (parameters.usesMipmapping) {
+            glGenerateMipmap(GL_TEXTURE_2D)
         }
     }
 
     fun unbind() {
         glBindTexture(GL_TEXTURE_2D, 0)
+    }
+
+    companion object {
+        private fun resizeImage(originalImage: ByteBuffer,
+                                originalWidth: Int, originalHeight: Int,
+                                resizedWidth: Int, resizedHeight: Int,
+                                channels: Int): ByteBuffer? {
+            val resizedImage = MemoryUtil.memAlloc(resizedHeight * resizedHeight * channels)
+            val success = stbir_resize_uint8(originalImage, originalWidth, originalHeight, 0,
+                    resizedImage, resizedWidth, resizedHeight, 0,
+                    channels)
+            return if (success) {
+                resizedImage
+            } else {
+                MemoryUtil.memFree(resizedImage)
+                null
+            }
+        }
+    }
+
+    fun powerOfTwoNotLess(n: Int): Int {
+        var k = 1
+        while (k < n) {
+            k*=2
+        }
+        return k
     }
 }
 
@@ -252,16 +302,25 @@ abstract class GLMaterial {
 }
 
 class FlatMaterial(override val program: GLProgram,
-                   val baseColorFactor: Vector4fc = defaultBaseColorFactor) : GLMaterial() {
+                   val baseColorFactor: Vector4fc) : GLMaterial() {
 
     override fun applyToProgram() {
         program.uniformParameters["color"]?.let { location ->
             UniformSetter.set(location, baseColorFactor)
         }
     }
+}
 
-    companion object {
-        val defaultBaseColorFactor: Vector4fc = Vector4f(1f, 1f, 1f, 1f)
+class TextureMaterial(override val program: GLProgram,
+                      val baseColorFactor: Vector4fc) : GLMaterial() {
+
+    override fun applyToProgram() {
+        program.uniformParameters["color"]?.let { location ->
+            UniformSetter.set(location, baseColorFactor)
+        }
+        program.uniformParameters["sampler"]?.let { location ->
+            glUniform1i(location, 0)
+        }
     }
 }
 

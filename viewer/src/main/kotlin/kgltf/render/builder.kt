@@ -12,7 +12,7 @@ import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import org.joml.Vector4f
-import org.lwjgl.opengl.GL11.GL_TRIANGLES
+import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL30.glGenVertexArrays
 import org.lwjgl.opengl.GLCapabilities
@@ -24,23 +24,27 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
     abstract val programBuilder: ProgramBuilder
 
     protected val bufferId = IntArray(gltf.bufferViews.size)
+    private val textureCount = gltf.textures?.size ?: 0
+    protected val textureId = IntArray(textureCount)
 
     private val bufferViews = ArrayList<GLBufferView>(gltf.bufferViews.size)
+    private val textures = ArrayList<GLTexture>(textureCount)
     private val accessors = ArrayList<GLAccessor>(gltf.accessors.size)
     private val materials = ArrayList<GLMaterial>(gltf.materials?.size ?: 0)
     private val meshes = ArrayList<GLMesh>(gltf.meshes.size)
     private val nodes = Array(gltf.nodes.size) { GLNode.emptyNode }
     protected val scenes = ArrayList<GLScene>(gltf.scenes.size)
 
-    protected val primitivesNum = gltf.meshes.map { it.primitives.size }.sum()
+    protected val primitivesCount = gltf.meshes.map { it.primitives.size }.sum()
     private val startPrimitiveIndex = gltf.meshes.map { it.primitives.size }.sums()
 
-    private val camerasNum = gltf.cameras?.size ?: 0
-    private val cameras = ArrayList<Camera>(camerasNum)
-    protected val cameraNodes = ArrayList<GLNode>(camerasNum)
+    private val camerasCount = gltf.cameras?.size ?: 0
+    private val cameras = ArrayList<Camera>(camerasCount)
+    protected val cameraNodes = ArrayList<GLNode>(camerasCount)
 
     open fun init() {
         glGenBuffers(bufferId)
+        glGenTextures(textureId)
     }
 
     final override fun visitBufferView(index: Int, bufferView: BufferView) {
@@ -54,6 +58,24 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
                     }
                 })
         logger.fine { "Init ${bufferView.genericName(index)}" }
+    }
+
+    override fun visitTexture(index: Int, texture: Texture) {
+        val sampler = texture.sampler?.let { gltf.samplers?.get(it) }
+        val parameters = GLTextureParameters(
+                magFilter = sampler?.magFilter,
+                minFilter = sampler?.minFilter,
+                wrapS = sampler?.wrapS ?: GL_REPEAT,
+                wrapT = sampler?.wrapT ?: GL_REPEAT
+        )
+        val data = texture.source?.let { data.images[it] } ?: error("No source data for texture ${texture.genericName(index)}")
+        val glTexture = GLTexture(textureId[index], parameters).apply {
+            bind()
+            initWithData(data)
+            unbind()
+        }
+        textures.add(glTexture)
+        logger.fine { "Init ${texture.genericName(index)}" }
     }
 
     final override fun visitAccessor(index: Int, accessor: Accessor) {
@@ -204,7 +226,7 @@ class GL2RendererBuilder(gltf: Gltf, data: GltfData, extensions: List<GltfExtens
 class GL3RendererBuilder(gltf: Gltf, data: GltfData, extensions: List<GltfExtension>) : GLRendererBuilder(gltf, data, extensions) {
 
     override val programBuilder: ProgramBuilder = ProgramBuilder("/shader/gl33")
-    private val vertexArrayId = IntArray(primitivesNum)
+    private val vertexArrayId = IntArray(primitivesCount)
 
     override fun init() {
         super.init()

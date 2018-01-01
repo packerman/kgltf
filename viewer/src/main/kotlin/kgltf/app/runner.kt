@@ -28,23 +28,36 @@ import java.util.logging.Logger
 fun Gltf.isExtensionRequired(extensionName: String): Boolean =
         extensionsRequired?.contains(extensionName) == true
 
-class Downloading(val gltf: Gltf, val bufferFuture: List<Future<ByteArray>>) {
+class Downloading(val gltf: Gltf,
+                  val bufferFuture: List<Future<ByteArray>>,
+                  val imageFuture: List<Future<ByteArray>>) {
     val buffers: List<ByteArray>
-        get() = bufferFuture.mapIndexed { index, future ->
-            val data = future.get()
-            val buffer = gltf.buffers[index]
-            check(data.size == buffer.byteLength)
-            logger.fine { "Download ${buffer.genericName("buffer", index)}" }
-            data
+        get() = bufferFuture.mapIndexed { i, future ->
+            future.get().also {
+                val buffer = gltf.buffers[i]
+                check(it.size == buffer.byteLength)
+                logger.fine { "Download ${buffer.genericName(i)}" }
+            }
+        }
+    val images: List<ByteArray>
+        get() = imageFuture.mapIndexed { i, future ->
+            future.get().also {
+                val image = requireNotNull(gltf.images)[i]
+                logger.fine { "Download ${image.genericName(i)}" }
+            }
         }
 }
 
-fun Downloading.collectData() = GltfData(buffers)
+fun Downloading.collectData() = GltfData(buffers, images)
 
 fun Gltf.startDownloadData(downloader: Downloader) =
-        Downloading(this, bufferFuture = buffers.map { buffer ->
-            downloader.downloadBytes(buffer.uri)
-        })
+        Downloading(this,
+                bufferFuture = buffers.map { buffer ->
+                    downloader.downloadBytes(buffer.uri)
+                },
+                imageFuture = images?.map { image ->
+                    downloader.downloadBytes(image.uri)
+                } ?: emptyList())
 
 inline fun <R> ExecutorService.use(block: (ExecutorService) -> R): R {
     try {

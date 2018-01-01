@@ -9,6 +9,9 @@ data class Gltf(val scenes: List<Scene>,
                 val cameras: List<Camera>?,
                 val buffers: List<Buffer>,
                 val bufferViews: List<BufferView>,
+                val images: List<Image>?,
+                val samplers: List<Sampler>?,
+                val textures: List<Texture>?,
                 val accessors: List<Accessor>,
                 val materials: List<Material>?,
                 val asset: Asset,
@@ -95,6 +98,8 @@ data class Buffer(override val name: String?,
                   val uri: String,
                   val byteLength: Int) : Named
 
+fun Buffer.genericName(i: Int) = genericName("buffer", i)
+
 data class BufferView(override val name: String?,
                       val buffer: Int,
                       val byteOffset: Int,
@@ -102,6 +107,25 @@ data class BufferView(override val name: String?,
                       val target: Int) : Named
 
 fun BufferView.genericName(i: Int) = genericName("bufferView", i)
+
+data class Image(override val name: String?,
+                 val uri: String) : Named
+
+fun Image.genericName(i: Int) = genericName("image", i)
+
+data class Sampler(override val name: String?,
+                   val magFilter: Int?,
+                   val minFilter: Int?,
+                   val wrapS: Int?,
+                   val wrapT: Int?): Named
+
+fun Sampler.genericName(i: Int) = genericName("sampler", i)
+
+data class Texture(override val name: String?,
+                   val sampler: Int?,
+                   val source: Int?): Named
+
+fun Texture.genericName(i: Int) = genericName("texture", i)
 
 data class Accessor(override val name: String?,
                     val bufferView: Int,

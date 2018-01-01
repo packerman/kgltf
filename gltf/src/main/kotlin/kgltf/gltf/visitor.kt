@@ -8,7 +8,8 @@ abstract class Visitor(val gltf: Gltf, val data: GltfData) {
                 check(bufferView.target in supportedTargets) { "Unsupported target" }
                 visitBufferView(index, bufferView)
             }
-            accessors.forEachIndexed { index, accessor -> visitAccessor(index, accessor) }
+            textures?.forEachIndexed(::visitTexture)
+            accessors.forEachIndexed(::visitAccessor)
             materials?.forEachIndexed { index, material ->
                 material.pbrMetallicRoughness?.baseColorFactor?.let {
                     require(it.size == 4)
@@ -40,6 +41,7 @@ abstract class Visitor(val gltf: Gltf, val data: GltfData) {
     }
 
     abstract fun visitBufferView(index: Int, bufferView: BufferView)
+    abstract fun visitTexture(index: Int, texture: Texture)
     abstract fun visitAccessor(index: Int, accessor: Accessor)
     abstract fun visitMaterial(index: Int, material: Material)
     abstract fun visitMesh(index: Int, mesh: Mesh)
@@ -73,6 +75,24 @@ abstract class Visitor(val gltf: Gltf, val data: GltfData) {
 
         fun numberOfComponents(type: String) =
                 requireNotNull(numberOfComponents[type]) { "Unknown type $type" }
+
+        const val NEAREST = 9728
+        const val LINEAR = 9729
+        const val NEAREST_MIPMAP_NEAREST = 9984
+        const val LINEAR_MIPMAP_NEAREST = 9985
+        const val NEAREST_MIPMAP_LINEAR = 9986
+        const val LINEAR_MIPMAP_LINEAR = 9987
+
+        val magFilters = setOf(NEAREST, LINEAR)
+        val minFilters = setOf(NEAREST, LINEAR, NEAREST_MIPMAP_NEAREST, LINEAR_MIPMAP_NEAREST, NEAREST_MIPMAP_LINEAR, LINEAR_MIPMAP_LINEAR)
+
+        const val CLAMP_TO_EDGE = 33071
+        const val MIRRORED_REPEAT = 33648
+        const val REPEAT = 10497
+
+        val wrappingModes = setOf(CLAMP_TO_EDGE, MIRRORED_REPEAT, REPEAT)
+
+        const val DEFAULT_WRAPPING_MODE = REPEAT
     }
 }
 

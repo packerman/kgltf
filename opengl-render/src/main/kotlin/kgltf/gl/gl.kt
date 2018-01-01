@@ -5,6 +5,7 @@ import kgltf.gl.math.Camera
 import kgltf.gl.math.IdentityCamera
 import kgltf.gl.math.Transform
 import kgltf.util.Disposable
+import kgltf.util.ensureMemoryFree
 import org.joml.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL15.*
@@ -12,6 +13,9 @@ import org.lwjgl.opengl.GL20.glEnableVertexAttribArray
 import org.lwjgl.opengl.GL20.glVertexAttribPointer
 import org.lwjgl.opengl.GL30.glBindVertexArray
 import org.lwjgl.opengl.GL30.glDeleteVertexArrays
+import org.lwjgl.stb.STBImage.*
+import org.lwjgl.system.MemoryStack
+import org.lwjgl.system.MemoryUtil
 
 class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 
@@ -37,6 +41,51 @@ class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 fun GLBufferView.initWithData(data: ByteArray, offset: Int = 0) {
     init()
     copyBufferData(data, offset)
+}
+
+data class GLTextureParameters(val magFilter: Int?, val minFilter: Int?,
+                               val wrapS: Int, val wrapT: Int) {
+    fun apply() {
+        magFilter?.let { glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, it) }
+        minFilter?.let { glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, it) }
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT)
+    }
+}
+
+class GLTexture(val texture: Int, val parameters: GLTextureParameters) {
+
+    fun bind() {
+        glBindTexture(GL_TEXTURE_2D, texture)
+    }
+
+    fun init() {
+        parameters.apply()
+    }
+
+    fun copyTextureData(data: ByteArray) {
+        MemoryUtil.memAlloc(data.size).ensureMemoryFree { buffer ->
+            buffer.put(data)
+            buffer.position(0)
+            MemoryStack.stackPush().use { stack ->
+                val width = stack.mallocInt(1)
+                val height = stack.mallocInt(1)
+                val channels = stack.mallocInt(1)
+                val image = stbi_load_from_memory(buffer, width, height, channels, 0) ?: error("Failed to load image: ${stbi_failure_reason()}")
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width[0], height[0], 0, GL_RGB, GL_UNSIGNED_BYTE, image)
+                stbi_image_free(image)
+            }
+        }
+    }
+
+    fun unbind() {
+        glBindTexture(GL_TEXTURE_2D, 0)
+    }
+}
+
+fun GLTexture.initWithData(data: ByteArray) {
+    init()
+    copyTextureData(data)
 }
 
 class GLAccessor(val bufferView: GLBufferView,

@@ -25,11 +25,6 @@ dependencies {
 
     compile "org.joml:joml:$jomlVersion"
 
-    compile "org.lwjgl:lwjgl:$lwjglVersion"
-    compile "org.lwjgl:lwjgl:$lwjglVersion:natives-windows"
-    compile "org.lwjgl:lwjgl:$lwjglVersion:natives-linux"
-    compile "org.lwjgl:lwjgl:$lwjglVersion:natives-macos"
-
     compile "org.lwjgl:lwjgl-glfw:$lwjglVersion"
     compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-windows"
     compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-linux"

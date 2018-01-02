@@ -12,7 +12,11 @@ private val extensionVariants = setOf(GltfTechniqueWebGL)
 private val additionalVariants = mapOf(
         Box to extensionVariants,
         BoxTextured to extensionVariants,
-        Duck to extensionVariants
+        Duck to extensionVariants,
+        TwoCylinderEngine to extensionVariants,
+        ReciprocatingSaw to extensionVariants,
+        GearboxAssy to extensionVariants,
+        Buggy to extensionVariants
         )
 
 fun main(args: Array<String>) {

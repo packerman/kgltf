@@ -4,6 +4,7 @@ import org.lwjgl.stb.STBImage
 import org.lwjgl.stb.STBImage.stbi_failure_reason
 import org.lwjgl.stb.STBImage.stbi_load
 import org.lwjgl.system.MemoryStack
+import org.lwjgl.system.MemoryUtil
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -22,4 +23,14 @@ inline fun <R> ByteBuffer.ensureImageFree(block: (ByteBuffer) -> R): R {
     } finally {
         STBImage.stbi_image_free(this)
     }
+}
+
+fun diffImage(image1: ByteBuffer, image2: ByteBuffer): ByteBuffer {
+    check(image1.capacity() == image2.capacity())
+    val diff = MemoryUtil.memAlloc(image1.capacity()) ?: error("Cannot allocate buffer")
+    for (i in 0 until image1.capacity()) {
+        diff.put(Math.abs(image1.get(i) - image2.get(i)).toByte())
+    }
+    diff.position(0)
+    return diff
 }

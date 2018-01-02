@@ -28,3 +28,8 @@ inline fun <R> ByteBuffer.ensureMemoryFree(block: (ByteBuffer) -> R): R {
         MemoryUtil.memFree(this)
     }
 }
+
+fun allocateBuffer(byteArray: ByteArray): ByteBuffer =
+        MemoryUtil.memAlloc(byteArray.size).use {
+            it.put(byteArray)
+        }

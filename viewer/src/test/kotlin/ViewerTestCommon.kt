@@ -13,6 +13,7 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import org.lwjgl.stb.STBImage
+import org.lwjgl.system.MemoryUtil
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.logging.Logger
@@ -44,8 +45,15 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
                                     logger.info { "Similarity: $similarity" }
                                 }
                                 if (similarity <= requiredSimilarity) {
-                                    saveImage("actual_tested_${testedSample}_${testedVariant}_${framebufferSize.width}x${framebufferSize.height}.png",
-                                            image, framebufferSize.width, framebufferSize.height, 4)
+                                    allocateBuffer(actualScreenshot).ensureMemoryFree { actualImage ->
+                                        saveImage("actual_tested_${testedSample}_${testedVariant}_${framebufferSize.width}x${framebufferSize.height}.png",
+                                                actualImage, framebufferSize.width, framebufferSize.height, 4)
+                                        diffImage(actualImage, image).ensureMemoryFree { diff ->
+                                            saveImage("diff_tested_${testedSample}_${testedVariant}_${framebufferSize.width}x${framebufferSize.height}.png",
+                                                    diff, framebufferSize.width, framebufferSize.height, 4)
+                                        }
+
+                                    }
                                 }
                                 assertThat(similarity, Matchers.greaterThan(requiredSimilarity))
                             }

@@ -31,6 +31,14 @@ fun makeScreenshot(window: Long, format: Int = GL_RGBA): ByteArray {
     }
 }
 
+fun saveImage(fileName: String, image: ByteBuffer, width: Int, height: Int, channels: Int) {
+    val byteStride = width * channels
+    MemoryUtil.memAlloc(height * byteStride).ensureMemoryFree { flippedImage ->
+        flipImage(image, height, byteStride, flippedImage)
+        stbi_write_png(fileName, width, height, channels, flippedImage, byteStride)
+    }
+}
+
 fun saveScreenshot(fileName: String, window: Long, format: Int = GL_RGBA): File {
     require(isSupportedFormat(format))
     MemoryStack.stackPush().use { stack ->
@@ -39,11 +47,7 @@ fun saveScreenshot(fileName: String, window: Long, format: Int = GL_RGBA): File 
         glfwGetFramebufferSize(window, width, height)
         makeScreenshot(width[0], height[0], format).ensureMemoryFree { image ->
             val channels = getBytesPerPixel(format)
-            val byteStride = width[0] * channels
-            MemoryUtil.memAlloc(height[0] * byteStride).ensureMemoryFree { flippedImage ->
-                flipImage(image, height[0], byteStride, flippedImage)
-                stbi_write_png(fileName, width[0], height[0], channels, flippedImage, byteStride)
-            }
+            saveImage(fileName, image, width[0], height[0], channels)
         }
     }
     return File(fileName).absoluteFile
@@ -52,10 +56,12 @@ fun saveScreenshot(fileName: String, window: Long, format: Int = GL_RGBA): File 
 private fun flipImage(src: ByteBuffer, height: Int, byteStride: Int, dest: ByteBuffer): ByteBuffer {
     val rowData = ByteArray(byteStride)
     val destPositions = (0 until height).map { it * byteStride }.reversed()
-    destPositions.forEach { destPosition ->
-        dest.position(destPosition)
-        src.get(rowData)
-        dest.put(rowData)
+    src.use {
+        destPositions.forEach { destPosition ->
+            dest.position(destPosition)
+            src.get(rowData)
+            dest.put(rowData)
+        }
     }
     dest.rewind()
     return dest

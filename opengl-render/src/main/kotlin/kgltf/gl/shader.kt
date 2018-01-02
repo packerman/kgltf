@@ -1,7 +1,6 @@
 package kgltf.gl
 
-import kgltf.gl.AttributeSemantic.Normal
-import kgltf.gl.AttributeSemantic.Position
+import kgltf.gl.AttributeSemantic.*
 import kgltf.gl.Shader.compile
 import kgltf.gl.UniformSemantic.ModelViewInverseTranspose
 import kgltf.gl.UniformSemantic.ModelViewProjection
@@ -34,6 +33,14 @@ class ProgramBuilder(val shaderDirectory: String) : Disposable {
                                 Normal to "normal"),
                         uniformSemantics = mapOf(ModelViewProjection to "modelViewProjectionMatrix",
                                 ModelViewInverseTranspose to "normalMatrix "))
+            },
+            "texture" to {
+                build("texture",
+                        attributeSemantics = mapOf(Position to "position",
+                                TexCoord0 to "texCoord"),
+                        uniformSemantics = mapOf(ModelViewProjection to "modelViewProjectionMatrix"),
+                        uniformParameters = setOf("color", "sampler")
+                        )
             })
 
     private val programs = HashMap<String, GLProgram>()
@@ -45,6 +52,18 @@ class ProgramBuilder(val shaderDirectory: String) : Disposable {
     }
 
     fun build(name: String, attributeSemantics: Map<Semantic, String> = emptyMap(),
+              uniformSemantics: Map<Semantic, String> = emptyMap(),
+              uniformParameters: Set<String> = emptySet()): GLProgram {
+        val shaders = collectShadersForProgram(name)
+        val program = GLProgram.link(shaders)
+        shaders.forEach(::glDeleteShader)
+        val attributeMap = attributeSemantics.mapValues { getAttributeLocation(program, it.value) }
+        val uniformMap = uniformSemantics.mapValues { getUniformLocation(program, it.value)  }
+        val parameterMap = uniformParameters.associate { it to getUniformLocation(program, it) }
+        return GLProgram(name, program, attributeMap, uniformMap, parameterMap)
+    }
+
+    fun build2(name: String, attributeSemantics: Map<Semantic, String> = emptyMap(),
               uniformSemantics: Map<Semantic, String> = emptyMap(),
               uniformParameters: Set<String> = emptySet()): GLProgram {
         val shaders = collectShadersForProgram(name)
@@ -168,7 +187,7 @@ enum class AttributeSemantic(_alternateName: String? = null) : Semantic {
     override val symbolicName = (_alternateName ?: name).toUpperCase(Locale.ROOT)
 }
 
-val attributeSemantics: Map<String, Semantic> = AttributeSemantic.values().associateBy { it.symbolicName }
+val attributeSemantics: Map<String, Semantic> = values().associateBy { it.symbolicName }
 
 object UniformSetter {
     private val color = FloatArray(4)

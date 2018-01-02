@@ -65,7 +65,9 @@ class TechniqueWebGl(jsonElement: JsonElement) : GltfExtension(EXTENSION_NAME) {
             val program = glTechnique.program
             val setters = HashMap<String, ParameterValueSetter>()
             for (parameter in program.uniformParameters.keys) {
-                val value = requireNotNull(material.values?.get(parameter))
+                val value = material.values?.get(parameter) ?:
+                        technique.parameters[parameter]?.value
+                        ?: error("No value for parameter '$parameter' in material $index")
                 val type = requireNotNull(technique.parameters[parameter]).type
                 setters[parameter] = createParameterValueSetter(value, type)
             }
@@ -84,20 +86,24 @@ class TechniqueWebGl(jsonElement: JsonElement) : GltfExtension(EXTENSION_NAME) {
         }
         val uniformMap = HashMap<Semantic, Int>()
         val parameterMap = HashMap<String, Int>()
+        val nodeTransforms = HashMap<Int, Int>()
         for ((uniformName, parameterName) in uniforms) {
             val parameter = requireNotNull(parameters[parameterName]) { "No parameter for uniform '$uniformName' provided" }
             val location = getUniformLocation(program.id, uniformName)
-            if (parameter.semantic != null) {
-                val semanticName = parameter.semantic
-                val semantic = requireNotNull(uniformSemantics[semanticName]) { "Unknown semantic name '$semanticName'" }
-                uniformMap[semantic] = location
-            } else {
-                parameterMap[parameterName] = location
+            when {
+                parameter.node != null -> nodeTransforms[parameter.node] = location
+                parameter.semantic != null -> {
+                    val semanticName = parameter.semantic
+                    val semantic = requireNotNull(uniformSemantics[semanticName]) { "Unknown semantic name '$semanticName'" }
+                    check(!uniformMap.containsKey(semantic)) { "There are two attributes of the same '$semantic' semantic." }
+                    uniformMap[semantic] = location
+                }
+                else -> parameterMap[parameterName] = location
             }
         }
         val glProgram = GLProgram("", program.id, attributeMap, uniformMap, parameterMap)
         val toEnable = states?.enable ?: emptyList()
-        GLTechnique(glProgram, toEnable)
+        GLTechnique(glProgram, toEnable, nodeTransforms)
     }
 
     companion object {
@@ -128,7 +134,9 @@ private data class Material(
 
 private data class Parameter(
         val type: Int,
-        val semantic: String?)
+        val semantic: String?,
+        val node: Int?,
+        val value: JsonArray?)
 
 
 private val supportedTypes: Set<Int> = setOf(
@@ -159,6 +167,7 @@ typealias ParameterValueSetter = (Int) -> Unit
 
 fun createParameterValueSetter(value: JsonArray, type: Int): ParameterValueSetter {
     fun JsonArray.getFloat(i: Int) = get(i).asJsonPrimitive.asFloat
+    fun JsonArray.getInt(i: Int) = get(i).asJsonPrimitive.asInt
     when (type) {
         GL_FLOAT_VEC4 -> {
             check(value.size() == 4)
@@ -168,10 +177,22 @@ fun createParameterValueSetter(value: JsonArray, type: Int): ParameterValueSette
             val v3 = value.getFloat(3)
             return { location -> glUniform4f(location, v0, v1, v2, v3) }
         }
+        GL_FLOAT_VEC3 -> {
+            check(value.size() == 3)
+            val v0 = value.getFloat(0)
+            val v1 = value.getFloat(1)
+            val v2 = value.getFloat(2)
+            return { location -> glUniform3f(location, v0, v1, v2) }
+        }
         GL_FLOAT -> {
             check(value.size() == 1)
             val v0 = value.getFloat(0)
             return { location -> glUniform1f(location, v0) }
+        }
+        GL_SAMPLER_2D -> {
+            check(value.size() == 1)
+            val v0 = value.getInt(0)
+            return { location -> glUniform1i(location, v0) }
         }
         else -> error("Unknown type $type")
     }
@@ -218,17 +239,26 @@ private fun reformatSource(source: String): String = buildString {
 }
 
 private data class GLTechnique(val program: GLProgram,
-                               val states: List<Int>)
+                               val states: List<Int>,
+                               val nodeTransforms: Map<Int, Int>) {
+
+    fun applyToProgram(context: RenderingContext) {
+        nodeTransforms.forEach { (node, location) ->
+            UniformSetter.set(location, context.nodes[node].transform.matrix)
+        }
+    }
+}
 
 private data class TechniqueMaterial(val technique: GLTechnique,
                                      val setters: Map<String, ParameterValueSetter>) : GLMaterial() {
     override val program: GLProgram = technique.program
 
-    override fun applyToProgram() {
+    override fun applyToProgram(context: RenderingContext) {
         setters.forEach { (name, setter) ->
             val location = requireNotNull(program.uniformParameters[name])
             setter(location)
         }
+        technique.applyToProgram(context)
     }
 }
 

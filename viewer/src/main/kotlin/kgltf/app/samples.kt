@@ -9,7 +9,8 @@ enum class KhronosSample(val variants: Set<Variant> = VariantSet.basic,
     SimpleMeshes,
     Cameras,
     Box(VariantSet.full),
-    BoxTextured(VariantSet.full);
+    BoxTextured(VariantSet.full),
+    Duck(VariantSet.full);
 
     val sampleName: String = alternateName ?: name
 

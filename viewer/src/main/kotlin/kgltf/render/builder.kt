@@ -121,7 +121,7 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
 
     final override fun visitMesh(index: Int, mesh: Mesh) {
         fun getMaterial(primitive: Primitive) =
-                primitive.material?.let { materials[it] } ?: FlatMaterial(programBuilder["flat"], Vector4f(0.5f, 0.5f, 0.5f, 1f))
+                primitive.material?.let { materials[it] } ?: createPbrMaterial(Material(null, null))
 
         fun getSemanticByName(name: String) =
                 requireNotNull(attributeSemantics[name]) { "Unknown attribute semantic '$name'" }
@@ -198,6 +198,8 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
         logger.fine { "Build ${scene.genericName(index)}" }
     }
 
+    fun createRenderingContext() = RenderingContext(nodes.toList())
+
     abstract fun build(): GLRenderer
 
     companion object {
@@ -225,7 +227,7 @@ class GL2RendererBuilder(gltf: Gltf, data: GltfData, extensions: List<GltfExtens
             GL2Primitive(mode, attributes, material)
 
     override fun build(): GLRenderer {
-        return GLRenderer(scenes, cameraNodes,
+        return GLRenderer(createRenderingContext(), scenes, cameraNodes,
                 GL2Disposable(bufferId, programBuilder))
     }
 }
@@ -247,7 +249,7 @@ class GL3RendererBuilder(gltf: Gltf, data: GltfData, extensions: List<GltfExtens
             GL3Primitive(vertexArrayId[primitiveIndex], mode, attributes, material)
 
     override fun build(): GLRenderer {
-        return GLRenderer(scenes, cameraNodes,
+        return GLRenderer(createRenderingContext(), scenes, cameraNodes,
                 GL3Disposable(vertexArrayId, bufferId, programBuilder))
     }
 }

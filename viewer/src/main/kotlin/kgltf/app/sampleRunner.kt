@@ -35,7 +35,20 @@ val sampleGltfTransformers: Map<KhronosSample, (Gltf) -> Gltf> =
                             .rotate(FloatMath.toRadians(30f), 0f, 1f, 0f)
                             .rotate(FloatMath.toRadians(-32f), 1f, 0f, 0f)
                     gltf.addCamera("addedCamera", additionalCamera, matrix.getList())
-                })
+                }
+//                ,
+//                KhronosSample.Duck to { gltf ->
+//                    val additionalCamera = Camera.of(Perspective(1f,
+//                            FloatMath.toRadians(45f),
+//                            0.01f,
+//                            1000f))
+//                    val matrix = Matrix4f()
+//                            .translate(1f, 2.0f, -1.75f)
+//                            .rotate(FloatMath.toRadians(150f), 0f, 1f, 0f)
+//                            .rotate(FloatMath.toRadians(-32f), 1f, 0f, 0f)
+//                    gltf.addCamera("addedCamera", additionalCamera, matrix.getList())
+//                }
+        )
 
 open class SampleApplicationRunner(config: Config, val sample: KhronosSample) : ApplicationRunner(config) {
     final override fun transformGltfModel(gltf: Gltf): Gltf {

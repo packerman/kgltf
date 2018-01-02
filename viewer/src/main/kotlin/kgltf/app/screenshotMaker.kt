@@ -1,7 +1,6 @@
 package kgltf.app
 
-import kgltf.app.KhronosSample.Box
-import kgltf.app.KhronosSample.values
+import kgltf.app.KhronosSample.*
 import kgltf.app.Variant.Gltf
 import kgltf.app.Variant.GltfTechniqueWebGL
 import kgltf.app.glfw.Application
@@ -11,8 +10,10 @@ import java.io.File
 private val extensionVariants = setOf(GltfTechniqueWebGL)
 
 private val additionalVariants = mapOf(
-        Box to extensionVariants
-)
+        Box to extensionVariants,
+        BoxTextured to extensionVariants,
+        Duck to extensionVariants
+        )
 
 fun main(args: Array<String>) {
 

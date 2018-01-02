@@ -58,6 +58,18 @@ class ProgramBuilder(val shaderDirectory: String) : Disposable {
         val program = GLProgram.link(shaders)
         shaders.forEach(::glDeleteShader)
         val attributeMap = attributeSemantics.mapValues { getAttributeLocation(program, it.value) }
+        val uniformMap = uniformSemantics.mapValues { getUniformLocation(program, it.value)  }
+        val parameterMap = uniformParameters.associate { it to getUniformLocation(program, it) }
+        return GLProgram(name, program, attributeMap, uniformMap, parameterMap)
+    }
+
+    fun build2(name: String, attributeSemantics: Map<Semantic, String> = emptyMap(),
+              uniformSemantics: Map<Semantic, String> = emptyMap(),
+              uniformParameters: Set<String> = emptySet()): GLProgram {
+        val shaders = collectShadersForProgram(name)
+        val program = GLProgram.link(shaders)
+        shaders.forEach(::glDeleteShader)
+        val attributeMap = attributeSemantics.mapValues { getAttributeLocation(program, it.value) }
         val uniformMap = uniformSemantics.mapValues { getUniformLocation(program, it.value) }
         val parameterMap = uniformParameters.associate { it to getUniformLocation(program, it) }
         return GLProgram(name, program, attributeMap, uniformMap, parameterMap)

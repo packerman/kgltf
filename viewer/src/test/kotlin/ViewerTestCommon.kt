@@ -6,14 +6,13 @@ import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Size
 import kgltf.util.*
-import org.hamcrest.CoreMatchers
+import org.hamcrest.CoreMatchers.*
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import org.lwjgl.stb.STBImage
-import org.lwjgl.system.MemoryUtil
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.logging.Logger
@@ -37,18 +36,18 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
                             application.render()
                             val actualScreenshot = application.screenshot()
                             val framebufferSize = application.framebufferSize
-                            expectedScreenshotForModel(application.framebufferSize, testedSample, testedVariant).ensureImageFree { image ->
-                                val expectedScreenshot = image.toArray()
-                                assertThat(actualScreenshot.size, CoreMatchers.equalTo(expectedScreenshot.size))
+                            expectedScreenshotForModel(application.framebufferSize, testedSample, testedVariant).ensureImageFree { expectedImage ->
+                                val expectedScreenshot = expectedImage.toArray()
+                                assertThat(actualScreenshot.size, equalTo(expectedScreenshot.size))
                                 val similarity = similarity(actualScreenshot, expectedScreenshot)
                                 if (similarity < 1) {
                                     logger.info { "Similarity: $similarity" }
                                 }
                                 if (similarity <= requiredSimilarity) {
-                                    allocateBuffer(actualScreenshot).ensureMemoryFree { actualImage ->
+                                    allocateBufferFor(actualScreenshot).ensureMemoryFree { actualImage ->
                                         saveImage("actual_tested_${testedSample}_${testedVariant}_${framebufferSize.width}x${framebufferSize.height}.png",
                                                 actualImage, framebufferSize.width, framebufferSize.height, 4)
-                                        diffImage(actualImage, image).ensureMemoryFree { diff ->
+                                        diffImage(actualImage, expectedImage).ensureMemoryFree { diff ->
                                             saveImage("diff_tested_${testedSample}_${testedVariant}_${framebufferSize.width}x${framebufferSize.height}.png",
                                                     diff, framebufferSize.width, framebufferSize.height, 4)
                                         }

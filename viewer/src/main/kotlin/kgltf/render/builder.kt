@@ -18,6 +18,7 @@ import org.lwjgl.opengl.GL13.glActiveTexture
 import org.lwjgl.opengl.GL15.glGenBuffers
 import org.lwjgl.opengl.GL30.glGenVertexArrays
 import org.lwjgl.opengl.GLCapabilities
+import org.lwjgl.stb.STBImage
 import java.util.logging.Logger
 import kgltf.gltf.Camera as GltfCamera
 
@@ -203,7 +204,8 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
     abstract fun build(): GLRenderer
 
     companion object {
-        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, data: GltfData, extensions: List<GltfExtension>): GLRenderer {
+        fun createRenderer(capabilities: GLCapabilities, gltf: Gltf, data: GltfData,
+                           extensions: List<GltfExtension>): GLRenderer {
             val builder = when {
                 capabilities.OpenGL33 -> GL3RendererBuilder(gltf, data, extensions)
                 capabilities.OpenGL21 -> GL2RendererBuilder(gltf, data, extensions)

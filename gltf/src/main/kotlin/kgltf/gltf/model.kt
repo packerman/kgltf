@@ -44,6 +44,13 @@ fun Gltf.addCamera(name: String, camera: Camera, transform: List<Float>): Gltf {
             cameras = cameraList)
 }
 
+fun Gltf.setNodeTransform(node: Int, transform: List<Float>): Gltf =
+        copy(nodes = nodes.mapIndexed { i, n ->
+            if (i == node)
+                n.copy(matrix = transform)
+            else n
+        })
+
 interface Named {
     val name: String?
 }
@@ -117,13 +124,13 @@ data class Sampler(override val name: String?,
                    val magFilter: Int?,
                    val minFilter: Int?,
                    val wrapS: Int?,
-                   val wrapT: Int?): Named
+                   val wrapT: Int?) : Named
 
 fun Sampler.genericName(i: Int) = genericName("sampler", i)
 
 data class Texture(override val name: String?,
                    val sampler: Int?,
-                   val source: Int?): Named
+                   val source: Int?) : Named
 
 fun Texture.genericName(i: Int) = genericName("texture", i)
 

@@ -5,9 +5,7 @@ import kgltf.app.getSampleModelUri
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Size
-import kgltf.util.ensureImageFree
-import kgltf.util.loadImageFromFile
-import kgltf.util.toArray
+import kgltf.util.*
 import org.hamcrest.CoreMatchers
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers
@@ -37,12 +35,17 @@ abstract class ViewerTestCommon(val testedSample: KhronosSample, val testedVaria
                         override fun render() {
                             application.render()
                             val actualScreenshot = application.screenshot()
+                            val framebufferSize = application.framebufferSize
                             expectedScreenshotForModel(application.framebufferSize, testedSample, testedVariant).ensureImageFree { image ->
                                 val expectedScreenshot = image.toArray()
                                 assertThat(actualScreenshot.size, CoreMatchers.equalTo(expectedScreenshot.size))
                                 val similarity = similarity(actualScreenshot, expectedScreenshot)
                                 if (similarity < 1) {
                                     logger.info { "Similarity: $similarity" }
+                                }
+                                if (similarity <= requiredSimilarity) {
+                                    saveImage("actual_tested_${testedSample}_${testedVariant}_${framebufferSize.width}x${framebufferSize.height}.png",
+                                            image, framebufferSize.width, framebufferSize.height, 4)
                                 }
                                 assertThat(similarity, Matchers.greaterThan(requiredSimilarity))
                             }

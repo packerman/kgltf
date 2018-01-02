@@ -433,7 +433,6 @@ class GLRenderer(val context: RenderingContext, val scenes: List<GLScene>, val c
     fun init() {
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_CULL_FACE)
-
         scenes.forEach { it.updateTransforms() }
     }
 

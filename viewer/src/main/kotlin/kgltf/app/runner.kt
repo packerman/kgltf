@@ -1,20 +1,20 @@
 package kgltf.app
 
+import ExtensionsLoader
 import com.google.gson.JsonElement
 import kgltf.app.glfw.Application
 import kgltf.app.glfw.Config
 import kgltf.app.glfw.Launcher
 import kgltf.data.Cache
 import kgltf.data.Downloader
-import kgltf.extension.ExtensionsLoader
 import kgltf.extension.GltfExtension
-import kgltf.extension.registerExtensions
 import kgltf.gl.FilterList
 import kgltf.gltf.Gltf
 import kgltf.gltf.GltfData
 import kgltf.gltf.genericName
 import kgltf.util.fromJson
 import kgltf.util.parseJson
+import registerExtensions
 import java.io.File
 import java.io.IOException
 import java.net.URI

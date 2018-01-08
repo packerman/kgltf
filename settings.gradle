@@ -5,4 +5,7 @@ include 'extensions'
 include 'common'
 include 'gltf'
 include 'download'
+include 'extensions:extension-common'
+include 'extensions:extension-register'
+include 'extensions:technique-webgl'
 

@@ -1,0 +1,6 @@
+
+dependencies {
+    compile project(':extensions:extension-common')
+    compile project(':extensions:technique-webgl')
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+}

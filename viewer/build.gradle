@@ -14,7 +14,7 @@ dependencies {
 
     compile project(':gltf')
     compile project(':opengl-render')
-    compile project(':extensions')
+    compile project(':extensions:extension-register')
 
     testCompile ("junit:junit:$junitVersion") {
         exclude module: 'hamcrest-core'

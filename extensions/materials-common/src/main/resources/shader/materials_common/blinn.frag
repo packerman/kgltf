@@ -31,18 +31,23 @@ void main() {
         lightVector[i] = normalize(lightDirection(i));
     }
 
-    vec3 eyeNormal = normalize(vEyeCoord);
+    vec3 eyeNormal = normalize(-vEyeCoord);
+    vec3 nNormal = normalize(vNormal);
 
 	fragColor = vec4(0);
 
     fragColor += emission;
 
     for (int i = 0; i < lightCount; i++) {
-        fragColor += diffuse * lightColor[i] * max(dot(vNormal, lightVector[i]), 0);
+        fragColor += ambient * lightColor[i];
     }
 
     for (int i = 0; i < lightCount; i++) {
-        vec4 halfwayVector = normalize(eyeNormal + lightVector[i]);
-        fragColor += specular * lightColor[i] * pow(max(dot(halfwayVector, vNormal), 0), shininess);
+        fragColor += diffuse * lightColor[i] * max(dot(nNormal, lightVector[i]), 0);
+    }
+
+    for (int i = 0; i < lightCount; i++) {
+        vec3 halfwayVector = normalize(eyeNormal + lightVector[i]);
+        fragColor += specular * lightColor[i] * pow(max(dot(halfwayVector, nNormal), 0), shininess);
     }
 }

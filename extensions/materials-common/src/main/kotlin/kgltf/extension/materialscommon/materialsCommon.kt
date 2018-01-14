@@ -7,20 +7,29 @@ import kgltf.gl.GLProgram
 import kgltf.gl.RenderingContext
 import kgltf.util.buildMap
 import kgltf.util.fromJson
+import kgltf.util.warnWhen
 import org.joml.Vector4f
 import org.joml.Vector4fc
+import java.util.logging.Logger
 
 class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSION_NAME) {
 
     private val model: MaterialsCommonModel = fromJson(jsonElement)
+    private val lightToNode = model.lightToNodeMap()
 
-    private val lights = createLights(model)
+    init {
+        logger.fine("Number of lights: ${model.extensions?.lights?.size ?: 0}")
+        warnWhen(model.extensions?.lights?.size.let { size -> size == null || size == 0 }) { "No lights defined for scene." }
+    }
+
+    private val lights = createLights(model.extensions?.lights ?: defaultLightList, lightToNode)
     private val lightUniformSetter = LightUniformSetter(lights)
 
     private val programBuilder = createMaterialsCommonProgramBuilder()
 
     private val colorProperties = mapOf(
-            "BLINN" to setOf("ambient", "diffuse", "emission", "specular")
+            "BLINN" to setOf("ambient", "diffuse", "emission", "specular"),
+            "PHONG" to setOf("ambient", "diffuse", "emission", "specular")
     )
 
     override fun createMaterial(index: Int): GLMaterial? =
@@ -33,6 +42,18 @@ class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSI
                         val program = programBuilder[programName]
                         val valueSetters: Map<String, UniformValueSetter> = buildMap {
                             for (colorProperty in requireNotNull(colorProperties["BLINN"])) {
+                                put(colorProperty, colorValueSetterFromElement(values[colorProperty], defaultColor))
+                            }
+                            put("shininess", parameterValueSetterFromElement(values["shininess"], 0f))
+                        }
+                        GLBlinnMaterialMaterial(program, valueSetters)
+                    }
+                    "PHONG" -> {
+                        val values = properties.values
+                        val programName = if (isSamplerValue(values["diffuse"])) "phong_texture" else "phong"
+                        val program = programBuilder[programName]
+                        val valueSetters: Map<String, UniformValueSetter> = buildMap {
+                            for (colorProperty in requireNotNull(colorProperties["PHONG"])) {
                                 put(colorProperty, colorValueSetterFromElement(values[colorProperty], defaultColor))
                             }
                             put("shininess", parameterValueSetterFromElement(values["shininess"], 0f))
@@ -100,9 +121,8 @@ class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSI
             else -> error("Unknown value: $jsonElement")
         }
 
-        fun createLights(model: MaterialsCommonModel): List<GLLight> {
-            val lightToNode = model.lightToNodeMap()
-            return model.extensions?.lights?.mapIndexed { i, light ->
+        fun createLights(lights: List<Light>, lightToNode: Map<Int, Int>): List<GLLight> {
+            return lights.mapIndexed { i, light ->
                 when (light.type) {
                     "directional" -> {
                         val directionalLight = requireNotNull(light.directional)
@@ -112,13 +132,20 @@ class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSI
                     }
                     else -> error("Unknown type of light: ${light.type}")
                 }
-            } ?: emptyList()
+            }
         }
 
         fun createColor(color: List<Float>?) =
                 if (color != null) Vector4f(color[0], color[1], color[2], color[3]) else defaultLightColor
 
         val defaultLightColor: Vector4fc = Vector4f(0f, 0f, 0f, 1f)
+
+        val defaultLightList = listOf(
+                Light(type = "directional",
+                        directional = DirectionalLight(
+                                color = listOf(1f, 1f, 1f, 1f)),
+                        point = null)
+        )
     }
 }
 
@@ -133,3 +160,5 @@ class GLBlinnMaterialMaterial(override val program: GLProgram,
         }
     }
 }
+
+private val logger = Logger.getLogger("extension.materialscommon")

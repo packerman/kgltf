@@ -7,9 +7,9 @@ uniform vec4 specular;
 uniform float shininess;
 
 uniform int lightCount;
-uniform vec3 lightPosition[4];
-uniform vec4 lightColor[4];
-uniform bool lightIsDirectional[4];
+uniform vec3 lightPosition[8];
+uniform vec4 lightColor[8];
+uniform bool lightIsDirectional[8];
 
 in vec3 vEyeCoord;
 in vec2 vTexCoord;
@@ -25,7 +25,7 @@ vec3 lightDirection(int i) {
 }
 
 void main() {
-    vec3 lightVector[4];
+    vec3 lightVector[8];
     for (int i = 0; i < lightCount; i++) {
         lightVector[i] = normalize(lightDirection(i));
     }
@@ -47,7 +47,7 @@ void main() {
     }
 
     for (int i = 0; i < lightCount; i++) {
-        vec3 halfwayVector = normalize(eyeNormal + lightVector[i]);
-        fragColor += specular * lightColor[i] * pow(max(dot(halfwayVector, nNormal), 0), shininess);
+        vec3 reflected = reflect(-lightVector[i], nNormal);
+        fragColor += specular * lightColor[i] * pow(max(dot(reflected, eyeNormal), 0), shininess);
     }
 }

@@ -53,7 +53,54 @@ private val materialsCommonPrograms = mapOf(
                         "lightPosition",
                         "lightColor",
                         "lightIsDirectional"
-                )))
+                )),
+        "phong" to ProgramDescription(
+                "phong",
+                attributeSemantics = mapOf(
+                        Position to "position",
+                        TexCoord0 to "uv",
+                        Normal to "normal"
+                ),
+                uniformSemantics = mapOf(
+                        UniformSemantic.ModelViewProjection to "modelViewProjectionMatrix",
+                        UniformSemantic.ModelView to "modelViewMatrix",
+                        UniformSemantic.ModelViewInverseTranspose to "normalMatrix"
+                ),
+                uniformParameters = setOf(
+                        "emission",
+                        "ambient",
+                        "diffuse",
+                        "specular",
+                        "shininess",
+                        "lightCount",
+                        "lightPosition",
+                        "lightColor",
+                        "lightIsDirectional"
+                )),
+        "phong_texture" to ProgramDescription(
+                "phong_texture",
+                attributeSemantics = mapOf(
+                        Position to "position",
+                        TexCoord0 to "uv",
+                        Normal to "normal"
+                ),
+                uniformSemantics = mapOf(
+                        UniformSemantic.ModelViewProjection to "modelViewProjectionMatrix",
+                        UniformSemantic.ModelView to "modelViewMatrix",
+                        UniformSemantic.ModelViewInverseTranspose to "normalMatrix"
+                ),
+                uniformParameters = setOf(
+                        "emission",
+                        "ambient",
+                        "diffuse",
+                        "specular",
+                        "shininess",
+                        "lightCount",
+                        "lightPosition",
+                        "lightColor",
+                        "lightIsDirectional"
+                ))
+        )
 
 fun createMaterialsCommonProgramBuilder(): ProgramBuilder {
     return ProgramBuilder("/shader/materials_common", materialsCommonPrograms)

@@ -16,7 +16,8 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Logger
 
-class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData, val extensions: List<GltfExtension>) : GlfwApplication(window) {
+class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData,
+                 val extensions: List<GltfExtension>) : GlfwApplication(window) {
 
     private lateinit var renderer: GLRenderer
 
@@ -42,6 +43,9 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData, val extension
 
     override fun render() {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+        extensions.forEach { extension ->
+            extension.preRender(renderer.context)
+        }
         if (renderer.camerasCount == 0) {
             renderer.render(sceneIndex)
         } else {

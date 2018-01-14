@@ -1,8 +1,9 @@
-package kgltf.extension
+package kgltf.extension.techniquewebgl
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import kgltf.data.Downloader
+import kgltf.extension.GltfExtension
 import kgltf.gl.*
 import kgltf.gltf.Named
 import kgltf.gltf.genericName
@@ -244,13 +245,13 @@ private data class GLTechnique(val program: GLProgram,
 
     fun applyToProgram(context: RenderingContext) {
         nodeTransforms.forEach { (node, location) ->
-            UniformSetter.set(location, context.nodes[node].transform.matrix)
+            UniformSetter.set(location, context.nodes[node].transformMatrix)
         }
     }
 }
 
 private data class TechniqueMaterial(val technique: GLTechnique,
-                                     val setters: Map<String, ParameterValueSetter>) : GLMaterial() {
+                                     val setters: Map<String, ParameterValueSetter>) : GLMaterial {
     override val program: GLProgram = technique.program
 
     override fun applyToProgram(context: RenderingContext) {

@@ -14,7 +14,6 @@ import kgltf.gltf.GltfData
 import kgltf.gltf.genericName
 import kgltf.util.fromJson
 import kgltf.util.parseJson
-import registerExtensions
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -73,7 +72,6 @@ open class ApplicationRunner(val config: Config) {
 
     fun runFor(uri: URI) {
         LoggingConfiguration.setUp()
-        registerExtensions()
         logger.info("Download files")
         Cache(downloadDirectory).use { cache ->
             val jsonTree = parseJson(cache.strings.get(uri))

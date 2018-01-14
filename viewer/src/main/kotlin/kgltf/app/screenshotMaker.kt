@@ -22,7 +22,7 @@ private val additionalVariants = mapOf(
 fun main(args: Array<String>) {
 
     fun createRunnerForSample(config: Config, sample: KhronosSample, variant: Variant) =
-            object : SampleApplicationRunner(config, sample) {
+            object : SampleApplicationRunner(config, sample, variant) {
                 override fun delegateApplication(application: Application): Application =
                         object : Application by application {
                             override fun render() {

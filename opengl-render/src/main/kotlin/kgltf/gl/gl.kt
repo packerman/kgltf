@@ -8,8 +8,7 @@ import kgltf.util.Disposable
 import kgltf.util.ensureMemoryFree
 import org.joml.*
 import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL13.GL_TEXTURE0
-import org.lwjgl.opengl.GL13.glActiveTexture
+import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL14.GL_MIRRORED_REPEAT
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
@@ -19,6 +18,7 @@ import org.lwjgl.stb.STBImageResize.stbir_resize_uint8
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
+import java.util.logging.Logger
 
 class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
 
@@ -89,6 +89,7 @@ class GLTexture(val texture: Int, val parameters: GLTextureParameters) {
                 val potHeight = powerOfTwoNotLess(height[0])
                 if (width[0] != potHeight || height[0] != potWidth) {
                     resizeImage(image, width[0], height[0], potWidth, potHeight, channels[0])?.ensureMemoryFree { resizedImage ->
+                        logger.warning { "Resize image from ${width[0]}x${height[0]} to ${potWidth}x$potHeight" }
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, potWidth, potHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, resizedImage)
                     } ?: error("Cannot resize image")
                 } else {
@@ -137,6 +138,52 @@ fun GLTexture.initWithData(data: ByteArray) {
     init()
     copyTextureData(data)
 }
+
+data class TextureUnit(val symbol: Int, val number: Int) {
+
+    fun makeActive() {
+        glActiveTexture(symbol)
+    }
+
+    fun setUniform(location: Int) {
+        glUniform1i(location, number)
+    }
+}
+
+val textureUnits = listOf(
+        TextureUnit(GL_TEXTURE0, 0),
+        TextureUnit(GL_TEXTURE1, 1),
+        TextureUnit(GL_TEXTURE2, 2),
+        TextureUnit(GL_TEXTURE3, 3),
+        TextureUnit(GL_TEXTURE4, 4),
+        TextureUnit(GL_TEXTURE5, 5),
+        TextureUnit(GL_TEXTURE6, 6),
+        TextureUnit(GL_TEXTURE7, 7),
+        TextureUnit(GL_TEXTURE8, 8),
+        TextureUnit(GL_TEXTURE9, 9),
+        TextureUnit(GL_TEXTURE10, 10),
+        TextureUnit(GL_TEXTURE11, 11),
+        TextureUnit(GL_TEXTURE12, 12),
+        TextureUnit(GL_TEXTURE13, 13),
+        TextureUnit(GL_TEXTURE14, 14),
+        TextureUnit(GL_TEXTURE15, 15),
+        TextureUnit(GL_TEXTURE16, 16),
+        TextureUnit(GL_TEXTURE17, 17),
+        TextureUnit(GL_TEXTURE18, 18),
+        TextureUnit(GL_TEXTURE19, 19),
+        TextureUnit(GL_TEXTURE20, 20),
+        TextureUnit(GL_TEXTURE21, 21),
+        TextureUnit(GL_TEXTURE22, 22),
+        TextureUnit(GL_TEXTURE23, 23),
+        TextureUnit(GL_TEXTURE24, 24),
+        TextureUnit(GL_TEXTURE25, 25),
+        TextureUnit(GL_TEXTURE26, 26),
+        TextureUnit(GL_TEXTURE27, 27),
+        TextureUnit(GL_TEXTURE28, 28),
+        TextureUnit(GL_TEXTURE29, 29),
+        TextureUnit(GL_TEXTURE30, 30),
+        TextureUnit(GL_TEXTURE31, 31)
+)
 
 class GLAccessor(val bufferView: GLBufferView,
                  val byteOffset: Long,
@@ -298,13 +345,13 @@ class GL3IndexedPrimitive(val vertexArray: Int,
 
 data class RenderingContext(val nodes: List<GLNode>)
 
-abstract class GLMaterial {
-    abstract val program: GLProgram
-    abstract fun applyToProgram(context: RenderingContext)
+interface GLMaterial {
+    val program: GLProgram
+    fun applyToProgram(context: RenderingContext)
 }
 
 class FlatMaterial(override val program: GLProgram,
-                   val baseColorFactor: Vector4fc) : GLMaterial() {
+                   val baseColorFactor: Vector4fc) : GLMaterial {
 
     override fun applyToProgram(context: RenderingContext) {
         program.uniformParameters["color"]?.let { location ->
@@ -314,7 +361,7 @@ class FlatMaterial(override val program: GLProgram,
 }
 
 class TextureMaterial(override val program: GLProgram,
-                      val baseColorFactor: Vector4fc) : GLMaterial() {
+                      val baseColorFactor: Vector4fc) : GLMaterial {
 
     override fun applyToProgram(context: RenderingContext) {
         program.uniformParameters["color"]?.let { location ->
@@ -345,19 +392,21 @@ class GLNode(private val localTransform: Transform,
              val mesh: GLMesh? = null,
              val camera: Camera? = null) {
 
-    val transform = Transform()
+    private val _transformMatrix = Matrix4f()
+    val transformMatrix: Matrix4fc
+        get() = _transformMatrix
 
     fun render(context: RenderingContext, cameraTransform: CameraTransform) {
         children.forEach { child ->
             child.render(context, cameraTransform)
         }
-        mesh?.render(context, transform.matrix, cameraTransform)
+        mesh?.render(context, _transformMatrix, cameraTransform)
     }
 
     fun updateTransforms(matrixStack: MatrixStackf) {
         matrixStack.pushMatrix()
         matrixStack.mul(localTransform.matrix)
-        transform.matrix = matrixStack
+        _transformMatrix.set(matrixStack)
         children.forEach { child ->
             child.updateTransforms(matrixStack)
         }
@@ -399,10 +448,10 @@ class CameraTransform {
     private val _projectionViewMatrix = Matrix4f()
     val projectionViewMatrix: Matrix4fc = _projectionViewMatrix
 
-    fun set(camera: Camera, transform: Transform) {
+    fun set(camera: Camera, transformMatrix: Matrix4fc) {
         _projectionMatrix.set(camera.projectionMatrix)
         _projectionMatrix
-                .mul(transform.matrix.invert(_viewMatrix), _projectionViewMatrix)
+                .mul(transformMatrix.invert(_viewMatrix), _projectionViewMatrix)
     }
 }
 
@@ -423,7 +472,10 @@ class GL3Disposable(val vertexArrayId: IntArray, bufferId: IntArray, programs: P
     }
 }
 
-class GLRenderer(val context: RenderingContext, val scenes: List<GLScene>, val cameraNodes: List<GLNode>, val disposable: Disposable) : Disposable {
+class GLRenderer(val context: RenderingContext,
+                 val scenes: List<GLScene>,
+                 val cameraNodes: List<GLNode>,
+                 val disposable: Disposable) : Disposable {
 
     val scenesCount: Int = scenes.size
     val camerasCount: Int = cameraNodes.size
@@ -455,7 +507,7 @@ class GLRenderer(val context: RenderingContext, val scenes: List<GLScene>, val c
 
     private fun render(scene: GLScene, cameraNode: GLNode) {
         val camera = requireNotNull(cameraNode.camera)
-        cameraTransforms.set(camera, cameraNode.transform)
+        cameraTransforms.set(camera, cameraNode.transformMatrix)
         scene.render(context, cameraTransforms)
     }
 
@@ -463,3 +515,5 @@ class GLRenderer(val context: RenderingContext, val scenes: List<GLScene>, val c
         disposable.dispose()
     }
 }
+
+private val logger = Logger.getLogger("render.gl")

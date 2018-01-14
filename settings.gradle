@@ -8,4 +8,4 @@ include 'download'
 include 'extensions:extension-common'
 include 'extensions:extension-register'
 include 'extensions:technique-webgl'
-
+include 'extensions:materials-common'

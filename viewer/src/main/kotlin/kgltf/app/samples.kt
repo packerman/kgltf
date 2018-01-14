@@ -1,5 +1,6 @@
 package kgltf.app
 
+import kgltf.gltf.Gltf
 import java.net.URI
 
 enum class KhronosSample(val variants: Set<Variant> = VariantSet.basic,
@@ -26,7 +27,8 @@ fun getSampleByName(name: String): KhronosSample? = KhronosSample.values().first
 enum class Variant(val value: String, val useExperimentalExtensions: Boolean = false) {
     Gltf("glTF"),
     GltfEmbedded("glTF-Embedded"),
-    GltfTechniqueWebGL("glTF-techniqueWebGL", true);
+    GltfTechniqueWebGL("glTF-techniqueWebGL", true),
+    GltfMaterialsCommon("glTF-MaterialsCommon", true);
 
     override fun toString() = value
 }
@@ -36,6 +38,12 @@ fun getVariantByName(name: String): Variant? = Variant.values().firstOrNull { it
 object VariantSet {
     val basic = setOf(Variant.Gltf, Variant.GltfEmbedded)
     val full = Variant.values().toSet()
+}
+
+data class KhronosModel(val sample: KhronosSample, val variant: Variant? = null) {
+    init {
+        require(variant == null || variant in sample.variants)
+    }
 }
 
 fun getSampleModelUri(sample: KhronosSample, variant: Variant = Variant.Gltf): URI {

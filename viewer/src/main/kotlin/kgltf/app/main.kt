@@ -21,7 +21,7 @@ fun main(args: Array<String>) {
             title = "glTF",
             samples = 4)
 
-    SampleApplicationRunner(config, sample).runFor(uri)
+    SampleApplicationRunner(config, sample, variant).runFor(uri)
 }
 
 val usageMessage: String by lazy {

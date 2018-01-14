@@ -18,54 +18,50 @@ import java.net.URL
 import java.util.*
 import kotlin.collections.HashMap
 
-class ProgramBuilder(val shaderDirectory: String) : Disposable {
+data class ProgramDescription(
+        val name: String,
+        val attributeSemantics: Map<Semantic, String>,
+        val uniformSemantics: Map<Semantic, String>,
+        val uniformParameters: Set<String> = emptySet()
+)
 
-    private val suppliers = mapOf(
-            "flat" to {
-                build("flat",
+private val defaultPrograms: Map<String, ProgramDescription> = mapOf(
+        "flat" to
+                ProgramDescription("flat",
                         attributeSemantics = mapOf(Position to "position"),
                         uniformSemantics = mapOf(ModelViewProjection to "modelViewProjectionMatrix"),
                         uniformParameters = setOf("color"))
-            },
-            "normal" to {
-                build("normal",
+        ,
+        "normal" to
+                ProgramDescription("normal",
                         attributeSemantics = mapOf(Position to "position",
                                 Normal to "normal"),
                         uniformSemantics = mapOf(ModelViewProjection to "modelViewProjectionMatrix",
                                 ModelViewInverseTranspose to "normalMatrix "))
-            },
-            "texture" to {
-                build("texture",
+        ,
+        "texture" to
+                ProgramDescription("texture",
                         attributeSemantics = mapOf(Position to "position",
                                 TexCoord0 to "texCoord"),
                         uniformSemantics = mapOf(ModelViewProjection to "modelViewProjectionMatrix"),
                         uniformParameters = setOf("color", "sampler")
-                        )
-            })
+                ))
+
+
+class ProgramBuilder(private val shaderDirectory: String,
+                     private val descriptions: Map<String, ProgramDescription> = defaultPrograms) : Disposable {
 
     private val programs = HashMap<String, GLProgram>()
 
-
     operator fun get(name: String): GLProgram = programs.computeIfAbsent(name) {
-        val supplier = requireNotNull(suppliers[it]) { "Program $name doesn't exist" }
-        supplier()
+        val description = requireNotNull(descriptions[it]) { "Program $name doesn't exist" }
+        buildFrom(description)
     }
 
-    fun build(name: String, attributeSemantics: Map<Semantic, String> = emptyMap(),
-              uniformSemantics: Map<Semantic, String> = emptyMap(),
-              uniformParameters: Set<String> = emptySet()): GLProgram {
-        val shaders = collectShadersForProgram(name)
-        val program = GLProgram.link(shaders)
-        shaders.forEach(::glDeleteShader)
-        val attributeMap = attributeSemantics.mapValues { getAttributeLocation(program, it.value) }
-        val uniformMap = uniformSemantics.mapValues { getUniformLocation(program, it.value)  }
-        val parameterMap = uniformParameters.associate { it to getUniformLocation(program, it) }
-        return GLProgram(name, program, attributeMap, uniformMap, parameterMap)
-    }
+    val usedPrograms: Collection<GLProgram>
+            get() = programs.values
 
-    fun build2(name: String, attributeSemantics: Map<Semantic, String> = emptyMap(),
-              uniformSemantics: Map<Semantic, String> = emptyMap(),
-              uniformParameters: Set<String> = emptySet()): GLProgram {
+    private fun buildFrom(description: ProgramDescription): GLProgram = with(description) {
         val shaders = collectShadersForProgram(name)
         val program = GLProgram.link(shaders)
         shaders.forEach(::glDeleteShader)

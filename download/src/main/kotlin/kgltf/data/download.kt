@@ -102,6 +102,7 @@ class Downloader(val baseUri: URI, val cache: Cache, val executorService: Execut
                 val resolvedUri = baseUri.resolve(uri)
                 when (resolvedUri.scheme) {
                     "http", "https" -> cache.strings.get(resolvedUri)
+                    "file" -> File(resolvedUri).readText()
                     else -> error("Unknown scheme ${resolvedUri.scheme}")
                 }
             }
@@ -113,6 +114,7 @@ class Downloader(val baseUri: URI, val cache: Cache, val executorService: Execut
                 when (resolvedUri.scheme) {
                     "http", "https" -> cache.bytes.get(resolvedUri)
                     "data" -> DataUri.encode(resolvedUri)
+                    "file" -> File(resolvedUri).readBytes()
                     else -> error("Unknown scheme ${resolvedUri.scheme}")
                 }
             }

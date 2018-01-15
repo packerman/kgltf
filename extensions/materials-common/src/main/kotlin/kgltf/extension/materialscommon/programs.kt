@@ -99,6 +99,47 @@ private val materialsCommonPrograms = mapOf(
                         "lightPosition",
                         "lightColor",
                         "lightIsDirectional"
+                )),
+        "lambert" to ProgramDescription(
+                "lambert",
+                attributeSemantics = mapOf(
+                        Position to "position",
+                        Normal to "normal"
+                ),
+                uniformSemantics = mapOf(
+                        UniformSemantic.ModelViewProjection to "modelViewProjectionMatrix",
+                        UniformSemantic.ModelView to "modelViewMatrix",
+                        UniformSemantic.ModelViewInverseTranspose to "normalMatrix"
+                ),
+                uniformParameters = setOf(
+                        "emission",
+                        "ambient",
+                        "diffuse",
+                        "lightCount",
+                        "lightPosition",
+                        "lightColor",
+                        "lightIsDirectional"
+                )),
+        "lambert_texture" to ProgramDescription(
+                "lambert_texture",
+                attributeSemantics = mapOf(
+                        Position to "position",
+                        TexCoord0 to "uv",
+                        Normal to "normal"
+                ),
+                uniformSemantics = mapOf(
+                        UniformSemantic.ModelViewProjection to "modelViewProjectionMatrix",
+                        UniformSemantic.ModelView to "modelViewMatrix",
+                        UniformSemantic.ModelViewInverseTranspose to "normalMatrix"
+                ),
+                uniformParameters = setOf(
+                        "emission",
+                        "ambient",
+                        "diffuse",
+                        "lightCount",
+                        "lightPosition",
+                        "lightColor",
+                        "lightIsDirectional"
                 ))
         )
 

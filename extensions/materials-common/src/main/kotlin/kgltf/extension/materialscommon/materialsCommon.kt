@@ -29,7 +29,8 @@ class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSI
 
     private val colorProperties = mapOf(
             "BLINN" to setOf("ambient", "diffuse", "emission", "specular"),
-            "PHONG" to setOf("ambient", "diffuse", "emission", "specular")
+            "PHONG" to setOf("ambient", "diffuse", "emission", "specular"),
+            "LAMBERT" to setOf("ambient", "diffuse", "emission")
     )
 
     override fun createMaterial(index: Int): GLMaterial? =
@@ -57,6 +58,17 @@ class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSI
                                 put(colorProperty, colorValueSetterFromElement(values[colorProperty], defaultColor))
                             }
                             put("shininess", parameterValueSetterFromElement(values["shininess"], 0f))
+                        }
+                        GLBlinnMaterialMaterial(program, valueSetters)
+                    }
+                    "LAMBERT" -> {
+                        val values = properties.values
+                        val programName = if (isSamplerValue(values["diffuse"])) "lambert_texture" else "lambert"
+                        val program = programBuilder[programName]
+                        val valueSetters: Map<String, UniformValueSetter> = buildMap {
+                            for (colorProperty in requireNotNull(colorProperties["LAMBERT"])) {
+                                put(colorProperty, colorValueSetterFromElement(values[colorProperty], defaultColor))
+                            }
                         }
                         GLBlinnMaterialMaterial(program, valueSetters)
                     }
@@ -117,6 +129,9 @@ class MaterialsCommonExtension(jsonElement: JsonElement) : GltfExtension(EXTENSI
                     1 -> FloatValueSetter(jsonArray[0].asJsonPrimitive.asFloat)
                     else -> error("Unknown value: $jsonElement")
                 }
+            }
+            jsonElement.isJsonPrimitive -> {
+                FloatValueSetter(jsonElement.asJsonPrimitive.asFloat)
             }
             else -> error("Unknown value: $jsonElement")
         }

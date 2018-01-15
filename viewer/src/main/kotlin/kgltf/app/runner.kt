@@ -74,7 +74,8 @@ open class ApplicationRunner(val config: Config) {
         LoggingConfiguration.setUp()
         logger.info("Download files")
         Cache(downloadDirectory).use { cache ->
-            val jsonTree = parseJson(cache.strings.get(uri))
+            val gltfString = if (uri.scheme == "file") File(uri).readText() else cache.strings.get(uri)
+            val jsonTree = parseJson(gltfString)
             val gltf: Gltf = fromJson(jsonTree)
             val transformedGltf = transformGltfModel(gltf)
             val extensions = loadExtensions(gltf, jsonTree)

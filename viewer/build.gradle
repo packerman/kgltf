@@ -29,4 +29,6 @@ dependencies {
     compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-windows"
     compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-linux"
     compile "org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-macos"
+
+    compile "commons-cli:commons-cli:$commonsCliVersion"
 }

@@ -111,6 +111,7 @@ data class BufferView(override val name: String?,
                       val buffer: Int,
                       val byteOffset: Int,
                       val byteLength: Int,
+                      val byteStride: Int?,
                       val target: Int) : Named
 
 fun BufferView.genericName(i: Int) = genericName("bufferView", i)

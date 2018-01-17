@@ -36,6 +36,17 @@ private val sampleGltfTransformers: Map<KhronosSample, GltfTransformer> = mapOf(
                     .rotate(FloatMath.toRadians(30f), 0f, 1f, 0f)
                     .rotate(FloatMath.toRadians(-32f), 1f, 0f, 0f)
             gltf.addCamera("addedCamera", additionalCamera, matrix.getList())
+        },
+        KhronosSample.BoxInterleaved to { gltf ->
+            val additionalCamera = Camera.of(Perspective(1f,
+                    FloatMath.toRadians(45f),
+                    0.01f,
+                    1000f))
+            val matrix = Matrix4f()
+                    .translate(1f, 1.25f, 1.75f)
+                    .rotate(FloatMath.toRadians(30f), 0f, 1f, 0f)
+                    .rotate(FloatMath.toRadians(-32f), 1f, 0f, 0f)
+            gltf.addCamera("addedCamera", additionalCamera, matrix.getList())
         }
 )
 

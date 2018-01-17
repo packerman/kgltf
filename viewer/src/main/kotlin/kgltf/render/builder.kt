@@ -66,7 +66,7 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
         bufferViews.add(
                 with(bufferView) {
                     val data = data.buffers[buffer]
-                    GLBufferView(target, bufferId[index], byteLength).apply {
+                    GLBufferView(target, bufferId[index], byteLength, byteStride ?: 0).apply {
                         bind()
                         initWithData(data, byteOffset)
                         unbind()

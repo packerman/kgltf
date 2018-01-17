@@ -20,7 +20,7 @@ import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
 import java.util.logging.Logger
 
-class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int) {
+class GLBufferView(val target: Int, val buffer: Int, val byteLength: Int, val byteStride: Int = 0) {
 
     fun bind() {
         glBindBuffer(target, buffer)
@@ -192,7 +192,7 @@ class GLAccessor(val bufferView: GLBufferView,
                  val numberOfComponents: Int) {
 
     fun setVertexAttribPointer(index: Int) {
-        glVertexAttribPointer(index, numberOfComponents, componentType, false, 0, byteOffset)
+        glVertexAttribPointer(index, numberOfComponents, componentType, false, bufferView.byteStride, byteOffset)
     }
 }
 

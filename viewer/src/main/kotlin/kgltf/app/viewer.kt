@@ -2,13 +2,16 @@ package kgltf.app
 
 import kgltf.app.glfw.GlfwApplication
 import kgltf.extension.GltfExtension
+import kgltf.gl.GLNode
 import kgltf.gl.GLRenderer
 import kgltf.gl.checkGLError
 import kgltf.gl.math.Color
 import kgltf.gl.math.Colors
+import kgltf.gl.math.PerspectiveCamera
 import kgltf.gltf.Gltf
 import kgltf.gltf.GltfData
 import kgltf.render.GLRendererBuilder
+import org.joml.*
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11.*
@@ -24,6 +27,8 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData,
     private var cameraIndex = 0
     private var sceneIndex = 0
 
+    private lateinit var cameraMovers: List<Mover>
+
     private val logger = Logger.getLogger("kgltf.viewer")
 
     override fun init() {
@@ -34,6 +39,12 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData,
         extensions.forEach(GltfExtension::initialize)
         renderer = GLRendererBuilder.createRenderer(capabilities, gltf, data, extensions)
         renderer.init()
+
+        if (renderer.camerasCount == 0) {
+            renderer.addCamera(PerspectiveCamera(1f, Math.toRadians(45.0).toFloat(), 1f, 1000f))
+        }
+
+        cameraMovers = renderer.cameraNodes.map(::Mover)
         checkGLError()
     }
 
@@ -85,6 +96,50 @@ class GltfViewer(window: Long, val gltf: Gltf, val data: GltfData,
                 logger.info("Saved screenshot to ${savedFile}")
             }
             keyPressed(GLFW_KEY_F) -> toggleFullscreen()
+            keyPressed(GLFW_KEY_DOWN) -> {
+                cameraMovers[cameraIndex].translate(0f, 0f, 1f)
+            }
+            keyPressed(GLFW_KEY_UP) -> {
+                cameraMovers[cameraIndex].translate(0f, 0f, -1f)
+            }
+            keyPressed(GLFW_KEY_U) -> {
+                cameraMovers[cameraIndex].rotate(Math.toRadians(-5.0).toFloat(), 1f, 0f, 0f)
+            }
+            keyPressed(GLFW_KEY_J) -> {
+                cameraMovers[cameraIndex].rotate(Math.toRadians(5.0).toFloat(), 1f, 0f, 0f)
+            }
+            keyPressed(GLFW_KEY_H) -> {
+                cameraMovers[cameraIndex].rotate(Math.toRadians(-5.0).toFloat(), 0f, 1f, 0f)
+            }
+            keyPressed(GLFW_KEY_K) -> {
+                cameraMovers[cameraIndex].rotate(Math.toRadians(5.0).toFloat(), 0f, 1f, 0f)
+            }
         }
+    }
+}
+
+class Mover(val node: GLNode) {
+
+    private val translation = Vector3f(0f, 0f, 0f)
+
+    private val rotation = Matrix4f()
+
+    private val quaternion = Quaternionf()
+
+    fun translate(dx: Float, dy: Float, dz: Float) {
+        translation.add(dx, dy, dz)
+        node.localTransform.translation = translation
+        node.updateTransforms(matrixStack)
+    }
+
+    fun rotate(angle: Float, x: Float, y: Float, z: Float) {
+        rotation.rotate(angle, x, y, z)
+        quaternion.setFromNormalized(rotation)
+        node.localTransform.rotation = quaternion
+        node.updateTransforms(matrixStack)
+    }
+
+    companion object {
+        private val matrixStack = MatrixStackf(2)
     }
 }

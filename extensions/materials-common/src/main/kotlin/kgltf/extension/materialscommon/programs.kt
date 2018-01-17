@@ -1,10 +1,7 @@
 package kgltf.extension.materialscommon
 
+import kgltf.gl.*
 import kgltf.gl.AttributeSemantic.*
-import kgltf.gl.ProgramBuilder
-import kgltf.gl.ProgramDescription
-import kgltf.gl.RenderingContext
-import kgltf.gl.UniformSemantic
 import org.lwjgl.opengl.GL20.*
 
 private val materialsCommonPrograms = mapOf(
@@ -162,7 +159,9 @@ class FloatVec4ValueSetter(private val v0: Float,
 
 class SamplerValueSetter(private val v0: Int) : UniformValueSetter {
     override fun set(location: Int, renderingContext: RenderingContext) {
-        glUniform1i(location, v0)
+        textureUnits[v0].makeActive()
+        renderingContext.textures[v0].bind()
+        textureUnits[v0].setUniform(location)
     }
 }
 

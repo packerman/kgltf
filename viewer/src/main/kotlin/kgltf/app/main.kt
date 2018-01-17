@@ -20,7 +20,8 @@ fun main(args: Array<String>) {
     val config = Config(width = 1024,
             height = 640,
             title = "glTF",
-            samples = 4)
+            samples = 4,
+            stickyKeys = true)
 
     when {
         line.hasOption("sample") -> {

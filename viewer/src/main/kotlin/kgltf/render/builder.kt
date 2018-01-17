@@ -60,6 +60,8 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
                 append("cameras - ${gltf.cameras?.size ?: 0}")
             }
         }
+
+        check(textureCount <= textureUnits.size)
     }
 
     final override fun visitBufferView(index: Int, bufferView: BufferView) {
@@ -85,7 +87,7 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
         )
         val data = texture.source?.let { data.images[it] } ?: error("No source data for texture ${texture.genericName(index)}")
         val glTexture = GLTexture(textureId[index], parameters).apply {
-            glActiveTexture(GL_TEXTURE0)
+            textureUnits[index].makeActive()
             bind()
             initWithData(data)
 //            unbind()
@@ -211,7 +213,7 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
         logger.fine { "Build ${scene.genericName(index)}" }
     }
 
-    fun createRenderingContext() = RenderingContext(nodes.toList())
+    fun createRenderingContext() = RenderingContext(nodes.toList(), textures)
 
     abstract fun build(): GLRenderer
 

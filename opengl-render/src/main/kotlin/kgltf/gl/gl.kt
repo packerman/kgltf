@@ -68,7 +68,6 @@ data class GLTextureParameters(val magFilter: Int, val minFilter: Int,
 class GLTexture(val texture: Int, val parameters: GLTextureParameters) {
 
     fun bind() {
-        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, texture)
     }
 
@@ -343,7 +342,7 @@ class GL3IndexedPrimitive(val vertexArray: Int,
     }
 }
 
-data class RenderingContext(val nodes: List<GLNode>)
+data class RenderingContext(val nodes: List<GLNode>, val textures: List<GLTexture>)
 
 interface GLMaterial {
     val program: GLProgram
@@ -387,7 +386,7 @@ class GLMesh(val primitives: List<GLPrimitive>) {
     }
 }
 
-class GLNode(private val localTransform: Transform,
+class GLNode(val localTransform: Transform,
              val children: List<GLNode>,
              val mesh: GLMesh? = null,
              val camera: Camera? = null) {
@@ -474,11 +473,16 @@ class GL3Disposable(val vertexArrayId: IntArray, bufferId: IntArray, programs: P
 
 class GLRenderer(val context: RenderingContext,
                  val scenes: List<GLScene>,
-                 val cameraNodes: List<GLNode>,
+                 cameraNodes: List<GLNode>,
                  val disposable: Disposable) : Disposable {
 
+    private var _cameraNodes = ArrayList<GLNode>(cameraNodes)
+    val cameraNodes: List<GLNode>
+        get() = _cameraNodes
+
     val scenesCount: Int = scenes.size
-    val camerasCount: Int = cameraNodes.size
+    val camerasCount: Int
+        get() = _cameraNodes.size
 
     private val cameraTransforms = CameraTransform()
 
@@ -500,7 +504,7 @@ class GLRenderer(val context: RenderingContext,
 
     fun resize(width: Int, height: Int) {
         val aspectRatio = width.toFloat() / height
-        cameraNodes.forEach {
+        _cameraNodes.forEach {
             requireNotNull(it.camera).update(aspectRatio)
         }
     }
@@ -509,6 +513,12 @@ class GLRenderer(val context: RenderingContext,
         val camera = requireNotNull(cameraNode.camera)
         cameraTransforms.set(camera, cameraNode.transformMatrix)
         scene.render(context, cameraTransforms)
+    }
+
+    fun addCamera(camera: Camera) {
+        _cameraNodes.add(GLNode(localTransform = Transform(),
+                children = emptyList(),
+                camera = camera))
     }
 
     override fun dispose() {

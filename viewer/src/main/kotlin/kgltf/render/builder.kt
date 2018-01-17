@@ -48,6 +48,18 @@ abstract class GLRendererBuilder(gltf: Gltf, data: GltfData, val extensions: Lis
     open fun init() {
         glGenBuffers(bufferId)
         glGenTextures(textureId)
+
+        logger.fine {
+            buildString {
+                append("buffer views - ${gltf.bufferViews.size}, ")
+                append("textures - ${gltf.textures?.size ?: 0}, ")
+                append("materials - ${gltf.materials?.size ?: 0}, ")
+                append("meshes - ${gltf.meshes.size}, ")
+                append("nodes - ${gltf.nodes.size}, ")
+                append("scenes - ${gltf.scenes.size}, ")
+                append("cameras - ${gltf.cameras?.size ?: 0}")
+            }
+        }
     }
 
     final override fun visitBufferView(index: Int, bufferView: BufferView) {

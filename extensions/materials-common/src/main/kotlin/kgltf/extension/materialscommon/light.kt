@@ -48,7 +48,7 @@ class GLDirectionalLight(val nodeIndex: Int?,
     }
 
     companion object {
-        val initialDirection: Vector3fc = Vector3f(0f, 0f, -1f)
+        val initialDirection: Vector3fc = Vector3f(0f, 0f, 1f)
     }
 }
 

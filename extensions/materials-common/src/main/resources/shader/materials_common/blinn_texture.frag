@@ -19,7 +19,7 @@ out vec4 fragColor;
 
 vec3 lightDirection(int i) {
     if (lightIsDirectional[i]) {
-        return lightPosition[i];
+        return -lightPosition[i];
     }
     return lightPosition[i] - vEyeCoord;
 }
